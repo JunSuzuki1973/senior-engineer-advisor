@@ -4,6 +4,11 @@
 
 Works immediately with OpenCode, Claude Code, Kilo CLI. Automates the Advisor Strategy and integrates with LLM Wiki for knowledge accumulation.
 
+## Recommended Repositories
+
+- **[Agency Agents](https://github.com/msitarzewski/agency-agents)** - Framework for specialist assignment system
+- **[Karpathy's LLM Wiki](https://github.com/karpathy/llm-wiki)** - Knowledge base management (required)
+
 ## Features
 
 - ✅ **Interactive Setup** - Configure advisor model during skill installation

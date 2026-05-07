@@ -4,6 +4,11 @@
 
 Agency Agents連携で専門家をアサイン、コードレビューで品質保証、LLM Wikiでナレッジ蓄積。
 
+## 推奨リポジトリ
+
+- **[Agency Agents](https://github.com/msitarzewski/agency-agents)** - 専門家システムのベースとなるフレームワーク
+- **[Karpathy's LLM Wiki](https://github.com/karpathy/llm-wiki)** - ナレッジベース管理（必須）
+
 ## 新機能（v2.0）
 
 - 🎯 **Agency Agents統合** - タスクに応じて専門家（Security Architect, Database Expert等）を自動アサイン

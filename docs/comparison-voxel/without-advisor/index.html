@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ボクセルアート風 モデルガン分解シミュレーター</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff;
+            overflow: hidden;
+            height: 100vh;
+        }
+        
+        #container {
+            display: flex;
+            height: 100vh;
+        }
+        
+        #canvas-container {
+            flex: 1;
+            position: relative;
+        }
+        
+        #sidebar {
+            width: 350px;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            overflow-y: auto;
+        }
+        
+        h1 {
+            font-size: 1.3rem;
+            text-align: center;
+            color: #00d4ff;
+            text-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(0, 212, 255, 0.3);
+        }
+        
+        .control-section {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 15px;
+        }
+        
+        .control-section h3 {
+            font-size: 0.9rem;
+            color: #00d4ff;
+            margin-bottom: 10px;
+        }
+        
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        button {
+            flex: 1;
+            min-width: 80px;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #00d4ff 0%, #0099cc 100%);
+            color: #000;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(0, 212, 255, 0.4);
+        }
+        
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+        
+        .btn-disassembly {
+            background: linear-gradient(135deg, #ff6b6b 0%, #cc5555 100%);
+            color: #fff;
+        }
+        
+        .btn-assembly {
+            background: linear-gradient(135deg, #51cf66 0%, #40c057 100%);
+            color: #000;
+        }
+        
+        #step-display {
+            background: rgba(0, 212, 255, 0.1);
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            border-radius: 10px;
+            padding: 15px;
+        }
+        
+        #step-number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #00d4ff;
+        }
+        
+        #step-title {
+            font-size: 1.1rem;
+            margin: 5px 0;
+            color: #fff;
+        }
+        
+        #step-description {
+            font-size: 0.85rem;
+            color: rgba(255, 255, 255, 0.7);
+            line-height: 1.5;
+        }
+        
+        #parts-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .part-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .part-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        
+        .part-item.active {
+            background: rgba(0, 212, 255, 0.2);
+            border: 1px solid #00d4ff;
+        }
+        
+        .part-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+        }
+        
+        .part-info {
+            flex: 1;
+        }
+        
+        .part-name {
+            font-size: 0.9rem;
+            font-weight: bold;
+        }
+        
+        .part-role {
+            font-size: 0.75rem;
+            color: rgba(255, 255, 255, 0.6);
+        }
+        
+        #info-panel {
+            background: rgba(255, 215, 0, 0.1);
+            border: 1px solid rgba(255, 215, 0, 0.3);
+            border-radius: 10px;
+            padding: 15px;
+        }
+        
+        #info-panel h3 {
+            color: #ffd700;
+        }
+        
+        #part-details {
+            font-size: 0.85rem;
+            line-height: 1.6;
+            color: rgba(255, 255, 255, 0.8);
+        }
+        
+        #progress-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+        
+        #progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00d4ff, #00ff88);
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+        
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 1.5rem;
+            color: #00d4ff;
+        }
+        
+        .camera-controls {
+            font-size: 0.8rem;
+            color: rgba(255, 255, 255, 0.5);
+            text-align: center;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+        }
+        
+        .speed-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .speed-control label {
+            font-size: 0.85rem;
+        }
+        
+        .speed-control input {
+            flex: 1;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="canvas-container">
+            <div id="loading">読み込み中...</div>
+        </div>
+        <div id="sidebar">
+            <h1>🔫 モデルガン分解シミュレーター</h1>
+            
+            <div class="control-section">
+                <h3>モード選択</h3>
+                <div class="btn-group">
+                    <button class="btn-disassembly" id="btn-disassembly">分解</button>
+                    <button class="btn-assembly" id="btn-assembly">組み立て</button>
+                </div>
+            </div>
+            
+            <div class="control-section">
+                <h3>操作</h3>
+                <div class="btn-group">
+                    <button class="btn-primary" id="btn-prev">◀ 前へ</button>
+                    <button class="btn-primary" id="btn-next">次へ ▶</button>
+                </div>
+                <div class="btn-group" style="margin-top: 10px;">
+                    <button class="btn-secondary" id="btn-reset">リセット</button>
+                    <button class="btn-secondary" id="btn-auto">自動再生</button>
+                </div>
+                <div class="speed-control">
+                    <label>速度:</label>
+                    <input type="range" id="speed-slider" min="0.5" max="3" step="0.5" value="1">
+                    <span id="speed-value">1x</span>
+                </div>
+            </div>
+            
+            <div id="step-display">
+                <span id="step-number">0 / 8</span>
+                <div id="step-title">待機中</div>
+                <div id="step-description">「分解」または「組み立て」を選択してください</div>
+                <div id="progress-bar">
+                    <div id="progress-fill" style="width: 0%"></div>
+                </div>
+            </div>
+            
+            <div class="control-section">
+                <h3>パーツ一覧</h3>
+                <div id="parts-list"></div>
+            </div>
+            
+            <div id="info-panel">
+                <h3>📋 パーツ詳細</h3>
+                <div id="part-details">パーツをクリックすると詳細が表示されます</div>
+            </div>
+            
+            <div class="camera-controls">
+                🖱️ ドラッグ: 回転 | スクロール: ズーム | 右クリック: 移動
+            </div>
+        </div>
+    </div>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        const partsData = [
+            {
+                name: 'スライド',
+                role: '遊底・発射機構',
+                color: 0x4a4a4a,
+                description: 'スライドは発射時に後退し、排莢と次弾装填を行います。リコイルスプリングの力で前進し、弾薬をチェンバーに送り込みます。',
+                voxelSize: 0.12,
+                shape: { type: 'slide' }
+            },
+            {
+                name: 'バレル',
+                role: '銃身・弾道制御',
+                color: 0x2a2a2a,
+                description: 'バレルは弾丸が通る銃身です。ライフリング（施条）により弾丸に回転を与え、飛行安定性を高めます。',
+                voxelSize: 0.08,
+                shape: { type: 'barrel' }
+            },
+            {
+                name: 'フレーム',
+                role: '本体構造',
+                color: 0x3a3a3a,
+                description: 'フレームは銃の基本構造を形成し、すべてのパーツを固定します。トリガーメカニズムやマガジンウェルが含まれます。',
+                voxelSize: 0.1,
+                shape: { type: 'frame' }
+            },
+            {
+                name: 'グリップ',
+                role: '握り・操作性',
+                color: 0x5c4033,
+                description: 'グリップは射撃時の握りやすさを提供します。素材や形状により射撃の安定性や操作性が変化します。',
+                voxelSize: 0.11,
+                shape: { type: 'grip' }
+            },
+            {
+                name: 'トリガー',
+                role: '発射制御',
+                color: 0x666666,
+                description: 'トリガーはシアを解放し、ハンマー/ストライカーを作動させることで発火シーケンスを開始します。',
+                voxelSize: 0.06,
+                shape: { type: 'trigger' }
+            },
+            {
+                name: 'マガジン',
+                role: '弾薬供給',
+                color: 0x555555,
+                description: 'マガジンは弾薬を格納し、スプリングの力で順次供給します。容量は通常10〜20発程度です。',
+                voxelSize: 0.09,
+                shape: { type: 'magazine' }
+            },
+            {
+                name: 'リコイルスプリング',
+                role: 'スライド復帰',
+                color: 0x888888,
+                description: 'リコイルスプリングは発射後のスライドを前進させ、次弾を装填します。バネ定数により作動の心地が変わります。',
+                voxelSize: 0.05,
+                shape: { type: 'spring' }
+            },
+            {
+                name: 'サイト',
+                role: '照準',
+                color: 0x111111,
+                description: 'フロントサイトとリアサイトで構成され、正確な照準を可能にします。調整可能なタイプもあります。',
+                voxelSize: 0.04,
+                shape: { type: 'sights' }
+            }
+        ];
+
+        const disassemblySteps = [
+            { title: 'マガジン取り外し', description: 'マガジンキャッチを押してマガジンを取り外します', partIndex: 5, position: new THREE.Vector3(0, -2, -1), rotation: new THREE.Euler(0, 0, 0) },
+            { title: 'スライド停止', description: 'スライドを後退させ、スライドストップで固定します', partIndex: 0, position: new THREE.Vector3(-0.5, 1.5, 0), rotation: new THREE.Euler(0.1, 0, 0) },
+            { title: 'バレル取り外し', description: 'バレルを前方に引き抜きます', partIndex: 1, position: new THREE.Vector3(2, 0.5, 0), rotation: new THREE.Euler(0, 0.3, 0) },
+            { title: 'リコイルスプリング取り外し', description: 'リコイルスプリングを取り外します', partIndex: 6, position: new THREE.Vector3(1.5, 0, -0.5), rotation: new THREE.Euler(0, 0, Math.PI/4) },
+            { title: 'スライド取り外し', description: 'スライドストップを解除し、スライドを前方に取り外します', partIndex: 0, position: new THREE.Vector3(-2, 1, 0), rotation: new THREE.Euler(0.2, -0.3, 0) },
+            { title: 'トリガー取り外し', description: 'トリガーメカニズムを取り外します', partIndex: 4, position: new THREE.Vector3(0.5, -0.5, -1.5), rotation: new THREE.Euler(0, 0, 0) },
+            { title: 'グリップ取り外し', description: 'グリップパネルを取り外します', partIndex: 3, position: new THREE.Vector3(0, -2.5, 0), rotation: new THREE.Euler(0, 0, 0.1) },
+            { title: 'サイト取り外し', description: 'サイトを取り外します', partIndex: 7, position: new THREE.Vector3(-1.5, 2, 0.5), rotation: new THREE.Euler(0, 0, 0) }
+        ];
+
+        let scene, camera, renderer, controls;
+        let parts = [];
+        let currentStep = 0;
+        let isAnimating = false;
+        let mode = 'disassembly';
+        let animationSpeed = 1;
+        let autoPlayInterval = null;
+        let selectedPartIndex = -1;
+
+        function init() {
+            const container = document.getElementById('canvas-container');
+            
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x1a1a2e);
+            
+            camera = new THREE.PerspectiveCamera(60, container.clientWidth / container.clientHeight, 0.1, 1000);
+            camera.position.set(5, 3, 5);
+            
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+            
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.minDistance = 3;
+            controls.maxDistance = 20;
+            
+            const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
+            scene.add(ambientLight);
+            
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+            directionalLight.position.set(5, 10, 5);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 2048;
+            directionalLight.shadow.mapSize.height = 2048;
+            scene.add(directionalLight);
+            
+            const pointLight1 = new THREE.PointLight(0x00d4ff, 0.5, 20);
+            pointLight1.position.set(-5, 3, 0);
+            scene.add(pointLight1);
+            
+            const pointLight2 = new THREE.PointLight(0xff6b6b, 0.3, 20);
+            pointLight2.position.set(5, -2, 0);
+            scene.add(pointLight2);
+            
+            const gridHelper = new THREE.GridHelper(20, 20, 0x00d4ff, 0x1a3a4a);
+            gridHelper.position.y = -3;
+            scene.add(gridHelper);
+            
+            createParts();
+            createPartsList();
+            setupEventListeners();
+            
+            document.getElementById('loading').style.display = 'none';
+            
+            animate();
+        }
+
+        function createVoxelGeometry(voxels, size = 0.1) {
+            const geometry = new THREE.BufferGeometry();
+            const positions = [];
+            const normals = [];
+            const indices = [];
+            let vertexOffset = 0;
+            
+            const faces = [
+                { normal: [0, 0, 1], vertices: [[0,0,1], [1,0,1], [1,1,1], [0,1,1]] },
+                { normal: [0, 0, -1], vertices: [[1,0,0], [0,0,0], [0,1,0], [1,1,0]] },
+                { normal: [0, 1, 0], vertices: [[0,1,1], [1,1,1], [1,1,0], [0,1,0]] },
+                { normal: [0, -1, 0], vertices: [[0,0,0], [1,0,0], [1,0,1], [0,0,1]] },
+                { normal: [1, 0, 0], vertices: [[1,0,1], [1,0,0], [1,1,0], [1,1,1]] },
+                { normal: [-1, 0, 0], vertices: [[0,0,0], [0,0,1], [0,1,1], [0,1,0]] }
+            ];
+            
+            for (const voxel of voxels) {
+                for (const face of faces) {
+                    for (const v of face.vertices) {
+                        positions.push((voxel[0] + v[0]) * size, (voxel[1] + v[1]) * size, (voxel[2] + v[2]) * size);
+                        normals.push(...face.normal);
+                    }
+                    indices.push(vertexOffset, vertexOffset + 1, vertexOffset + 2, vertexOffset, vertexOffset + 2, vertexOffset + 3);
+                    vertexOffset += 4;
+                }
+            }
+            
+            geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+            geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+            geometry.setIndex(indices);
+            
+            return geometry;
+        }
+
+        function generateVoxelModel(type, size) {
+            const voxels = [];
+            
+            switch(type) {
+                case 'slide':
+                    for (let x = 0; x < 25; x++) {
+                        for (let y = 0; y < 8; y++) {
+                            for (let z = 0; z < 6; z++) {
+                                if (x > 20 && y > 5) continue;
+                                if (x > 22 && z > 3) continue;
+                                if (x < 3 && z > 4) continue;
+                                voxels.push([x - 12, y - 4, z - 3]);
+                            }
+                        }
+                    }
+                    break;
+                    
+                case 'barrel':
+                    for (let x = 0; x < 20; x++) {
+                        const r = 2;
+                        for (let y = -r; y <= r; y++) {
+                            for (let z = -r; z <= r; z++) {
+                                if (y*y + z*z <= r*r) {
+                                    voxels.push([x - 10, y, z]);
+                                }
+                            }
+                        }
+                    }
+                    for (let x = 0; x < 15; x++) {
+                        const r = 1;
+                        for (let y = -r; y <= r; y++) {
+                            for (let z = -r; z <= r; z++) {
+                                if (y*y + z*z <= r*r) {
+                                    voxels.push([x - 7, y, z]);
+                                }
+                            }
+                        }
+                    }
+                    break;
+                    
+                case 'frame':
+                    for (let x = 0; x < 18; x++) {
+                        for (let y = 0; y < 10; y++) {
+                            for (let z = 0; z < 5; z++) {
+                                if (x > 15 && y > 7) continue;
+                                if (x < 5 && y < 3) continue;
+                                if (x > 5 && x < 10 && y < 2) continue;
+                                if (x > 12 && y < 4) continue;
+                                voxels.push([x - 9, y - 5, z - 2]);
+                            }
+                        }
+                    }
+                    break;
+                    
+                case 'grip':
+                    for (let y = 0; y < 12; y++) {
+                        for (let z = 0; z < 5; z++) {
+                            for (let x = 0; x < 4; x++) {
+                                const indent = y > 8 ? Math.floor((y - 8) / 2) : 0;
+                                if (x >= indent) {
+                                    voxels.push([x - 2, -y - 2, z - 2]);
+                                }
+                            }
+                        }
+                    }
+                    break;
+                    
+                case 'trigger':
+                    for (let y = 0; y < 6; y++) {
+                        for (let z = 0; z < 2; z++) {
+                            for (let x = 0; x < 2; x++) {
+                                voxels.push([x - 1, y - 3, z - 1]);
+                            }
+                        }
+                    }
+                    for (let x = 0; x < 4; x++) {
+                        for (let z = 0; z < 2; z++) {
+                            voxels.push([x - 2, -4, z - 1]);
+                        }
+                    }
+                    break;
+                    
+                case 'magazine':
+                    for (let y = 0; y < 15; y++) {
+                        for (let z = 0; z < 3; z++) {
+                            for (let x = 0; x < 5; x++) {
+                                if (y > 12 && z > 1) continue;
+                                voxels.push([x - 2, -y, z - 1]);
+                            }
+                        }
+                    }
+                    break;
+                    
+                case 'spring':
+                    for (let i = 0; i < 30; i++) {
+                        const angle = i * 0.8;
+                        const r = 1.5;
+                        const x = Math.cos(angle) * r;
+                        const z = Math.sin(angle) * r;
+                        const y = i * 0.3;
+                        voxels.push([Math.round(x), Math.round(y) - 4, Math.round(z)]);
+                    }
+                    break;
+                    
+                case 'sights':
+                    for (let y = 0; y < 3; y++) {
+                        for (let z = 0; z < 2; z++) {
+                            for (let x = 0; x < 2; x++) {
+                                voxels.push([x - 1, y, z - 1]);
+                            }
+                        }
+                    }
+                    for (let x = 0; x < 5; x++) {
+                        voxels.push([x + 2, 0, 0]);
+                        voxels.push([x + 2, 1, 0]);
+                    }
+                    break;
+            }
+            
+            return voxels;
+        }
+
+        function createParts() {
+            const offsets = [
+                { pos: [0, 0.3, 0], rot: [0, 0, 0] },
+                { pos: [0.5, 0.4, 0], rot: [0, 0, 0] },
+                { pos: [0, -0.2, 0], rot: [0, 0, 0] },
+                { pos: [0, -1.2, 0], rot: [0, 0, 0] },
+                { pos: [-0.3, -0.4, 0.2], rot: [0, 0, 0] },
+                { pos: [0, -1.5, 0], rot: [0, 0, 0] },
+                { pos: [0.3, 0.2, 0], rot: [0, 0, 0] },
+                { pos: [-0.8, 0.6, 0], rot: [0, 0, 0] }
+            ];
+            
+            partsData.forEach((data, index) => {
+                const voxels = generateVoxelModel(data.shape.type, data.voxelSize);
+                const geometry = createVoxelGeometry(voxels, data.voxelSize);
+                
+                const material = new THREE.MeshStandardMaterial({
+                    color: data.color,
+                    roughness: 0.4,
+                    metalness: data.name === 'グリップ' ? 0.1 : 0.7,
+                    flatShading: true
+                });
+                
+                const mesh = new THREE.Mesh(geometry, material);
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+                
+                const offset = offsets[index];
+                mesh.position.set(...offset.pos);
+                mesh.rotation.set(...offset.rot);
+                
+                mesh.userData = {
+                    originalPosition: mesh.position.clone(),
+                    originalRotation: mesh.rotation.clone(),
+                    index: index,
+                    data: data
+                };
+                
+                parts.push(mesh);
+                scene.add(mesh);
+            });
+        }
+
+        function createPartsList() {
+            const listContainer = document.getElementById('parts-list');
+            listContainer.innerHTML = '';
+            
+            partsData.forEach((data, index) => {
+                const item = document.createElement('div');
+                item.className = 'part-item';
+                item.innerHTML = `
+                    <div class="part-color" style="background: #${data.color.toString(16).padStart(6, '0')}"></div>
+                    <div class="part-info">
+                        <div class="part-name">${data.name}</div>
+                        <div class="part-role">${data.role}</div>
+                    </div>
+                `;
+                item.addEventListener('click', () => selectPart(index));
+                listContainer.appendChild(item);
+            });
+        }
+
+        function selectPart(index) {
+            selectedPartIndex = index;
+            
+            document.querySelectorAll('.part-item').forEach((item, i) => {
+                item.classList.toggle('active', i === index);
+            });
+            
+            const data = partsData[index];
+            document.getElementById('part-details').innerHTML = `
+                <strong>${data.name}</strong><br><br>
+                ${data.description}
+            `;
+            
+            focusOnPart(index);
+        }
+
+        function focusOnPart(index) {
+            const part = parts[index];
+            if (!part) return;
+            
+            const targetPosition = part.position.clone();
+            const cameraOffset = new THREE.Vector3(3, 2, 3);
+            
+            const targetCameraPosition = targetPosition.clone().add(cameraOffset);
+            
+            animateCameraTo(targetCameraPosition, targetPosition);
+        }
+
+        function animateCameraTo(targetPosition, lookAt) {
+            const startPosition = camera.position.clone();
+            const startTime = performance.now();
+            const duration = 1000;
+            
+            function update() {
+                const elapsed = performance.now() - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                const eased = 1 - Math.pow(1 - progress, 3);
+                
+                camera.position.lerpVectors(startPosition, targetPosition, eased);
+                controls.target.lerp(lookAt, eased);
+                
+                if (progress < 1) {
+                    requestAnimationFrame(update);
+                }
+            }
+            
+            update();
+        }
+
+        function setupEventListeners() {
+            document.getElementById('btn-disassembly').addEventListener('click', () => {
+                mode = 'disassembly';
+                currentStep = 0;
+                updateUI();
+            });
+            
+            document.getElementById('btn-assembly').addEventListener('click', () => {
+                mode = 'assembly';
+                currentStep = 0;
+                updateUI();
+            });
+            
+            document.getElementById('btn-prev').addEventListener('click', () => {
+                if (!isAnimating && currentStep > 0) {
+                    currentStep--;
+                    animateStep();
+                }
+            });
+            
+            document.getElementById('btn-next').addEventListener('click', () => {
+                if (!isAnimating && currentStep < disassemblySteps.length) {
+                    currentStep++;
+                    animateStep();
+                }
+            });
+            
+            document.getElementById('btn-reset').addEventListener('click', resetAll);
+            
+            document.getElementById('btn-auto').addEventListener('click', toggleAutoPlay);
+            
+            document.getElementById('speed-slider').addEventListener('input', (e) => {
+                animationSpeed = parseFloat(e.target.value);
+                document.getElementById('speed-value').textContent = animationSpeed + 'x';
+            });
+            
+            window.addEventListener('resize', onWindowResize);
+            
+            renderer.domElement.addEventListener('click', onMouseClick);
+        }
+
+        function onMouseClick(event) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            const mouse = new THREE.Vector2(
+                ((event.clientX - rect.left) / rect.width) * 2 - 1,
+                -((event.clientY - rect.top) / rect.height) * 2 + 1
+            );
+            
+            const raycaster = new THREE.Raycaster();
+            raycaster.setFromCamera(mouse, camera);
+            
+            const intersects = raycaster.intersectObjects(parts);
+            if (intersects.length > 0) {
+                const index = intersects[0].object.userData.index;
+                selectPart(index);
+            }
+        }
+
+        function animateStep() {
+            if (isAnimating) return;
+            isAnimating = true;
+            
+            const stepIndex = mode === 'disassembly' ? currentStep - 1 : disassemblySteps.length - currentStep;
+            
+            if (mode === 'disassembly' && currentStep > 0) {
+                const step = disassemblySteps[currentStep - 1];
+                animatePartTo(step.partIndex, step.position, step.rotation);
+            } else if (mode === 'assembly') {
+                const stepIndex = currentStep;
+                if (stepIndex < disassemblySteps.length) {
+                    const step = disassemblySteps[stepIndex];
+                    const part = parts[step.partIndex];
+                    animatePartTo(step.partIndex, part.userData.originalPosition, part.userData.originalRotation);
+                }
+            }
+            
+            updateUI();
+        }
+
+        function animatePartTo(partIndex, targetPosition, targetRotation) {
+            const part = parts[partIndex];
+            const startPosition = part.position.clone();
+            const startRotation = new THREE.Euler().copy(part.rotation);
+            const startTime = performance.now();
+            const duration = 800 / animationSpeed;
+            
+            function update() {
+                const elapsed = performance.now() - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                const eased = 1 - Math.pow(1 - progress, 4);
+                
+                part.position.lerpVectors(startPosition, targetPosition, eased);
+                
+                part.rotation.x = startRotation.x + (targetRotation.x - startRotation.x) * eased;
+                part.rotation.y = startRotation.y + (targetRotation.y - startRotation.y) * eased;
+                part.rotation.z = startRotation.z + (targetRotation.z - startRotation.z) * eased;
+                
+                if (progress < 1) {
+                    requestAnimationFrame(update);
+                } else {
+                    isAnimating = false;
+                }
+            }
+            
+            update();
+        }
+
+        function resetAll() {
+            stopAutoPlay();
+            isAnimating = true;
+            currentStep = 0;
+            
+            const promises = parts.map((part, index) => {
+                return new Promise(resolve => {
+                    const startPosition = part.position.clone();
+                    const startRotation = new THREE.Euler().copy(part.rotation);
+                    const targetPosition = part.userData.originalPosition.clone();
+                    const targetRotation = new THREE.Euler().copy(part.userData.originalRotation);
+                    const startTime = performance.now();
+                    const duration = 600;
+                    
+                    function update() {
+                        const elapsed = performance.now() - startTime;
+                        const progress = Math.min(elapsed / duration, 1);
+                        const eased = 1 - Math.pow(1 - progress, 3);
+                        
+                        part.position.lerpVectors(startPosition, targetPosition, eased);
+                        part.rotation.x = startRotation.x + (targetRotation.x - startRotation.x) * eased;
+                        part.rotation.y = startRotation.y + (targetRotation.y - startRotation.y) * eased;
+                        part.rotation.z = startRotation.z + (targetRotation.z - startRotation.z) * eased;
+                        
+                        if (progress < 1) {
+                            requestAnimationFrame(update);
+                        } else {
+                            resolve();
+                        }
+                    }
+                    
+                    update();
+                });
+            });
+            
+            Promise.all(promises).then(() => {
+                isAnimating = false;
+                updateUI();
+            });
+        }
+
+        function toggleAutoPlay() {
+            if (autoPlayInterval) {
+                stopAutoPlay();
+            } else {
+                startAutoPlay();
+            }
+        }
+
+        function startAutoPlay() {
+            document.getElementById('btn-auto').textContent = '停止';
+            document.getElementById('btn-auto').classList.add('btn-primary');
+            
+            autoPlayInterval = setInterval(() => {
+                if (!isAnimating) {
+                    if (currentStep < disassemblySteps.length) {
+                        currentStep++;
+                        animateStep();
+                    } else {
+                        stopAutoPlay();
+                    }
+                }
+            }, 1500 / animationSpeed);
+        }
+
+        function stopAutoPlay() {
+            if (autoPlayInterval) {
+                clearInterval(autoPlayInterval);
+                autoPlayInterval = null;
+            }
+            document.getElementById('btn-auto').textContent = '自動再生';
+            document.getElementById('btn-auto').classList.remove('btn-primary');
+        }
+
+        function updateUI() {
+            const totalSteps = disassemblySteps.length;
+            document.getElementById('step-number').textContent = `${currentStep} / ${totalSteps}`;
+            
+            if (currentStep === 0) {
+                document.getElementById('step-title').textContent = mode === 'disassembly' ? '分解準備完了' : '組み立て準備完了';
+                document.getElementById('step-description').textContent = mode === 'disassembly' ? 
+                    '「次へ」をクリックして分解を開始してください' : 
+                    '「次へ」をクリックして組み立てを開始してください';
+            } else if (currentStep <= totalSteps) {
+                const step = disassemblySteps[currentStep - 1];
+                document.getElementById('step-title').textContent = step.title;
+                document.getElementById('step-description').textContent = step.description;
+            } else {
+                document.getElementById('step-title').textContent = mode === 'disassembly' ? '分解完了' : '組み立て完了';
+                document.getElementById('step-description').textContent = mode === 'disassembly' ? 
+                    'すべてのパーツを分解しました' : 
+                    'すべてのパーツを組み立てました';
+            }
+            
+            const progress = (currentStep / totalSteps) * 100;
+            document.getElementById('progress-fill').style.width = `${progress}%`;
+        }
+
+        function onWindowResize() {
+            const container = document.getElementById('canvas-container');
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        init();
+    </script>
+</body>
+</html>

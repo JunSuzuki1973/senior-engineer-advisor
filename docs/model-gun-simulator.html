@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>展示モデル分解・組立シミュレーター</title>
+<style>
+  :root{
+    --bg:#0f1724; --panel:#0b1220; --accent:#38bdf8; --muted:#94a3b8; --card:#0b1320;
+  }
+  html,body{height:100%;margin:0;font-family:Inter,system-ui,Arial;background:linear-gradient(180deg,#071023 0%, #071428 100%);color:#e6eef8}
+  .app{display:flex;gap:18px;padding:20px;box-sizing:border-box;height:100%}
+  .left{
+    width:640px; min-width:420px; background:linear-gradient(180deg,rgba(255,255,255,0.02), transparent);
+    border-radius:12px;padding:18px;box-shadow:0 8px 30px rgba(2,6,23,.6);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+  }
+  .viewport{width:100%;height:540px;position:relative;perspective:1200px;display:flex;align-items:center;justify-content:center}
+  .model{width:420px;height:240px;transform-style:preserve-3d;transition:transform .6s;position:relative}
+  .part{
+    position:absolute;left:0;top:0;width:100%;height:100%;transform-origin:210px 120px;transition:transform .6s,opacity .4s;
+    cursor:pointer;
+  }
+  .part.hidden{opacity:.12;pointer-events:none}
+  .part.highlighted svg path{stroke:var(--accent);stroke-width:3}
+  .controls{display:flex;gap:8px;margin-top:12px}
+  button{background:#0b1224;border:1px solid rgba(255,255,255,0.03);color:var(--accent);padding:8px 12px;border-radius:8px;cursor:pointer}
+  button.ghost{background:transparent;color:var(--muted);border:1px solid rgba(255,255,255,0.02)}
+  .right{flex:1;min-width:320px}
+  .panel{background:linear-gradient(180deg,#061021  , #07122a);padding:16px;border-radius:12px;box-shadow:0 6px 18px rgba(3,7,18,.6)}
+  h1{font-size:18px;margin:0 0 10px 0;color:#dff7ff}
+  .meta{color:var(--muted);font-size:13px;margin-bottom:10px}
+  .steps{margin-top:10px;background:rgba(255,255,255,0.02);padding:12px;border-radius:10px;max-height:360px;overflow:auto}
+  .step{padding:10px;border-radius:8px;margin-bottom:8px;background:transparent;border:1px solid rgba(255,255,255,0.02)}
+  .step.active{background:linear-gradient(90deg, rgba(56,189,248,0.06), rgba(56,189,248,0.02));border-color:rgba(56,189,248,0.12)}
+  .parts-list{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+  .part-item{display:flex;justify-content:space-between;align-items:center;padding:8px;border-radius:8px;background:rgba(255,255,255,0.01);cursor:pointer}
+  .part-item:hover{background:rgba(255,255,255,0.02)}
+  .label{font-size:14px}
+  .role{font-size:12px;color:var(--muted)}
+  .footer{display:flex;justify-content:space-between;gap:8px;margin-top:12px}
+  .mode{display:flex;gap:8px}
+  .rotate{display:flex;gap:8px;align-items:center}
+  .note{font-size:12px;color:var(--muted);margin-top:10px}
+  @media (max-width:980px){
+    .app{flex-direction:column;padding:12px}
+    .left{width:100%}
+    .right{width:100%}
+  }
+</style>
+</head>
+<body>
+<div class="app" role="application" aria-label="展示モデル分解組立シミュレーター">
+  <div class="left panel" id="left">
+    <div style="display:flex;justify-content:space-between;align-items:center;width:100%;margin-bottom:8px">
+      <div>
+        <h1>展示モデル 分解・組立シミュレーター</h1>
+        <div class="meta">非可動の展示モデル（教育・視覚化用） — 実物の分解手順や安全に関わる情報は含みません。</div>
+      </div>
+      <div style="text-align:right;color:var(--muted);font-size:12px">Mode: <span id="modeLabel">Disassembly</span></div>
+    </div>
+    <div class="viewport">
+      <div class="model" id="model" aria-hidden="false" title="Click parts to highlight">
+        <div class="part" id="part-shell" data-part="shell" aria-label="Outer shell">
+          <svg viewBox="0 0 420 240" width="100%" height="100%">
+            <defs><linearGradient id="g-shell" x1="0" x2="1"><stop offset="0" stop-color="#263645"/><stop offset="1" stop-color="#1b2b3a"/></linearGradient></defs>
+            <path d="M20 60 Q40 30 80 28 H340 Q380 30 400 60 V180 Q380 210 340 212 H80 Q40 210 20 180 Z" fill="url(#g-shell)" stroke="#111827" stroke-width="2"/>
+            <path d="M40 80 H380" stroke="rgba(255,255,255,0.03)"/>
+          </svg>
+        </div>
+        <div class="part" id="part-slide" data-part="slide" aria-label="Slide sleeve">
+          <svg viewBox="0 0 420 240" width="100%" height="100%">
+            <defs><linearGradient id="g-slide" x1="0" x2="1"><stop offset="0" stop-color="#30445a"/><stop offset="1" stop-color="#22343f"/></linearGradient></defs>
+            <rect x="70" y="36" width="280" height="36" rx="6" fill="url(#g-slide)" stroke="#08101a" stroke-width="1.5"/>
+            <rect x="80" y="44" width="40" height="20" rx="3" fill="#0b1620"/>
+          </svg>
+        </div>
+        <div class="part" id="part-barrel" data-part="barrel" aria-label="Inner tube">
+          <svg viewBox="0 0 420 240" width="100%" height="100%">
+            <defs><linearGradient id="g-barrel" x1="0" x2="1"><stop offset="0" stop-color="#b6c7d8"/><stop offset="1" stop-color="#9fb3c4"/></linearGradient></defs>
+            <rect x="90" y="80" width="240" height="20" rx="6" fill="url(#g-barrel)" stroke="#0e1b24"/>
+            <circle cx="320" cy="90" r="10" fill="#c7d6e3"/>
+          </svg>
+        </div>
+        <div class="part" id="part-grip" data-part="grip" aria-label="Grip shell">
+          <svg viewBox="0 0 420 240" width="100%" height="100%">
+            <defs><linearGradient id="g-grip" x1="0" x2="1"><stop offset="0" stop-color="#2b3946"/><stop offset="1" stop-color="#17232b"/></linearGradient></defs>
+            <path d="M120 170 Q130 210 170 220 H250 Q290 210 300 170 L300 160 Q260 150 210 148 Q160 150 120 160 Z" fill="url(#g-grip)" stroke="#081018" stroke-width="1.5"/>
+          </svg>
+        </div>
+        <div class="part" id="part-spring" data-part="spring" aria-label="Decorative spring">
+          <svg viewBox="0 0 420 240" width="100%" height="100%">
+            <g transform="translate(170,92)">
+              <path d="M0 0 C10 -6, 20 -6, 30 0 C40 6, 50 6, 60 0" stroke="#f4d35e" stroke-width="4" fill="none" stroke-linecap="round"/>
+              <path d="M0 10 C10 4, 20 4, 30 10 C40 16, 50 16, 60 10" stroke="#f4d35e" stroke-width="4" fill="none" stroke-linecap="round" transform="translate(0,6)"/>
+            </g>
+          </svg>
+        </div>
+        <div class="part" id="part-sight" data-part="sight" aria-label="Sight">
+          <svg viewBox="0 0 420 240" width="100%" height="100%"><rect x="200" y="24" width="20" height="10" rx="2" fill="#0f1720"/></svg>
+        </div>
+      </div>
+    </div>
+    <div class="controls" role="group" aria-label="Controls">
+      <button id="prevBtn" class="ghost">Prev</button>
+      <button id="nextBtn">Next</button>
+      <div style="flex:1"></div>
+      <div class="rotate">
+        <button id="rotLeft" class="ghost">Rotate ◀</button>
+        <button id="rotRight" class="ghost">Rotate ▶</button>
+      </div>
+    </div>
+    <div class="note">注: このシミュレーションは展示用の非可動モデルを想定しています。実物の分解や整備は専門家に任せてください。</div>
+  </div>
+  <div class="right">
+    <div class="panel">
+      <h1>手順と部品情報</h1>
+      <div class="meta">手順は視覚化と教育目的のみ。組立は分解の逆順になります。</div>
+      <div class="steps" id="steps" aria-live="polite"></div>
+      <div style="display:flex;gap:16px;margin-top:12px;align-items:flex-start">
+        <div style="flex:1">
+          <h2 style="font-size:14px;margin:0 0 8px 0;color:#dff7ff">パーツ一覧</h2>
+          <div class="parts-list" id="partsList"></div>
+        </div>
+        <div style="width:220px">
+          <h2 style="font-size:14px;margin:0 0 8px 0;color:#dff7ff">詳細</h2>
+          <div id="partDetail" style="min-height:110px;padding:10px;border-radius:8px;background:rgba(255,255,255,0.01)">
+            <div style="color:var(--muted)">パーツを選択してください。</div>
+          </div>
+        </div>
+      </div>
+      <div class="footer">
+        <div class="mode"><button id="modeToggle" class="ghost">Toggle Mode</button></div>
+        <div style="color:var(--muted);font-size:12px">視覚モード: 図解 (SVG)</div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>"use strict";
+const PARTS=[{id:"shell",name:"外装シェル",role:"外観を形成する外装パネル（展示的・非機能）",el:null,defaultTransform:"translateZ(0px) rotateX(0deg)"},{id:"slide",name:"スライド風パネル",role:"上面の装飾パネル（外観要素）",el:null,defaultTransform:"translateZ(0px)"},{id:"barrel",name:"インナーチューブ（展示）",role:"前面の展示用チューブ（非可動）",el:null,defaultTransform:"translateZ(0px)"},{id:"grip",name:"グリップシェル",role:"下部のハウジング（外観）",el:null,defaultTransform:"translateZ(0px)"},{id:"spring",name:"装飾スプリング",role:"視覚的な金属リング（非機能）",el:null,defaultTransform:"translateZ(0px)"},{id:"sight",name:"サイト（飾り）",role:"上面の小型飾り（視覚要素）",el:null,defaultTransform:"translateZ(0px)"}];
+const DISASSEMBLY_STEPS=[{id:"s1",title:"外装シェルの取り外し",description:"外装シェルを前方へスライドさせるように表示を分離します（展示用の視覚的操作）。",affects:["shell"]},{id:"s2",title:"スライド風パネルの分離",description:"上面のパネルを引き抜くような視覚的アニメーションで分離します（非機能）。",affects:["slide"]},{id:"s3",title:"インナーチューブを露出",description:"インナーチューブ（展示用）を手前に移動させて見せます。",affects:["barrel"]},{id:"s4",title:"グリップシェルの分離",description:"下部ハウジングを外して内部の構造を見せます（飾り目的）。",affects:["grip"]},{id:"s5",title:"装飾スプリングとサイトの表示",description:"装飾パーツを個別に引き出してそれぞれの形状を観察します。",affects:["spring","sight"]}];
+let mode="disassembly",stepIndex=0,rotation=0;
+const modelEl=document.getElementById("model"),stepsEl=document.getElementById("steps"),partsListEl=document.getElementById("partsList"),partDetailEl=document.getElementById("partDetail"),modeLabel=document.getElementById("modeLabel");
+PARTS.forEach(p=>{p.el=document.getElementById("part-"+p.id);if(p.el)p.el.setAttribute("title",p.name)});
+function renderSteps(){stepsEl.innerHTML="";const s=mode==="disassembly"?DISASSEMBLY_STEPS:[...DISASSEMBLY_STEPS].reverse();s.forEach((t,i)=>{const d=document.createElement("div");d.className="step"+(i===stepIndex?" active":"");d.dataset.index=i;d.innerHTML='<strong style="display:block;margin-bottom:6px">'+(i+1)+". "+t.title+'</strong><div style="font-size:13px;color:var(--muted)">'+t.description+"</div>";d.addEventListener("click",()=>{goToStep(i)});stepsEl.appendChild(d)})}
+function renderParts(){partsListEl.innerHTML="";PARTS.forEach(p=>{const r=document.createElement("div");r.className="part-item";r.innerHTML='<div><div class="label">'+p.name+'</div><div class="role">'+p.role+'</div></div><div><button class="ghost" data-part="'+p.id+'">Highlight</button></div>';const b=r.querySelector("button");b.addEventListener("click",e=>{highlightPart(p.id);e.stopPropagation()});r.addEventListener("click",()=>{showPartDetail(p.id)});partsListEl.appendChild(r)})}
+function highlightPart(id){PARTS.forEach(p=>{if(p.id===id){p.el.classList.add("highlighted");p.el.style.transform="translateZ(40px) rotateX(6deg)"}else{p.el.classList.remove("highlighted");p.el.style.transform=p.defaultTransform}});showPartDetail(id);setTimeout(()=>{PARTS.forEach(p=>p.el.classList.remove("highlighted"));PARTS.forEach(p=>p.el.style.transform=p.defaultTransform)},2500)}
+function showPartDetail(id){const p=PARTS.find(x=>x.id===id);if(!p)return;partDetailEl.innerHTML='<div style="font-weight:600">'+p.name+'</div><div style="margin-top:8px;color:var(--muted)">'+p.role+"</div>"}
+function applyStep(index){const steps=mode==="disassembly"?DISASSEMBLY_STEPS:[...DISASSEMBLY_STEPS].reverse();PARTS.forEach(p=>{p.el.classList.remove("hidden");p.el.style.opacity=1;p.el.style.transform=p.defaultTransform});if(mode==="disassembly"){for(let i=0;i<=index&&i<steps.length;i++){steps[i].affects.forEach(pid=>{const p=PARTS.find(x=>x.id===pid);if(!p)return;if(pid==="shell")p.el.style.transform="translateZ(120px) translateX(-12px) rotateX(6deg)";if(pid==="slide")p.el.style.transform="translateZ(90px) translateY(-10px) rotateX(4deg)";if(pid==="barrel")p.el.style.transform="translateZ(70px) translateX(12px)";if(pid==="grip")p.el.style.transform="translateZ(60px) translateY(18px) rotateZ(-8deg)";if(pid==="spring")p.el.style.transform="translateZ(50px) translateX(28px) rotateZ(10deg)";if(pid==="sight")p.el.style.transform="translateZ(60px) translateY(-26px)"})}for(let i=0;i<=index&&i<steps.length;i++){steps[i].affects.forEach(pid=>{const p=PARTS.find(x=>x.id===pid);if(p)p.el.style.opacity=0.85})}}else{PARTS.forEach(p=>{p.el.style.opacity=0.12});for(let i=0;i<=index&&i<steps.length;i++){steps[i].affects.forEach(pid=>{const p=PARTS.find(x=>x.id===pid);if(!p)return;p.el.style.opacity=1;p.el.style.transform=p.defaultTransform})}}document.querySelectorAll(".step").forEach((el,idx)=>{el.classList.toggle("active",idx===index)})}
+function goToStep(i){const max=DISASSEMBLY_STEPS.length-1;if(i<0)i=0;if(i>max)i=max;stepIndex=i;renderSteps();applyStep(stepIndex);updateButtons()}
+function updateButtons(){const p=document.getElementById("prevBtn"),n=document.getElementById("nextBtn"),max=DISASSEMBLY_STEPS.length-1;p.disabled=stepIndex===0;n.disabled=stepIndex===max;p.style.opacity=p.disabled?0.36:1;n.style.opacity=n.disabled?0.36:1}
+document.getElementById("nextBtn").addEventListener("click",()=>{const max=DISASSEMBLY_STEPS.length-1;if(stepIndex<max){stepIndex++;goToStep(stepIndex)}});
+document.getElementById("prevBtn").addEventListener("click",()=>{if(stepIndex>0){stepIndex--;goToStep(stepIndex)}});
+document.getElementById("rotLeft").addEventListener("click",()=>{rotation=(rotation-18)%360;modelEl.style.transform="rotateY("+rotation+"deg)"});
+document.getElementById("rotRight").addEventListener("click",()=>{rotation=(rotation+18)%360;modelEl.style.transform="rotateY("+rotation+"deg)"});
+document.getElementById("modeToggle").addEventListener("click",()=>{mode=mode==="disassembly"?"assembly":"disassembly";modeLabel.textContent=mode==="disassembly"?"Disassembly":"Assembly";stepIndex=0;renderSteps();applyStep(stepIndex);updateButtons()});
+PARTS.forEach(p=>{if(p.el){p.el.addEventListener("click",e=>{highlightPart(p.id);e.stopPropagation()})}});
+document.getElementById("left").addEventListener("click",e=>{if(e.target===document.getElementById("left")||e.target===modelEl||e.target.closest(".viewport")){PARTS.forEach(p=>{p.el.classList.remove("highlighted");p.el.style.transform=p.defaultTransform})}});
+renderParts();renderSteps();applyStep(stepIndex);updateButtons();showPartDetail(PARTS[0].id);
+</script>
+</body>
+</html>

@@ -241,58 +241,75 @@ ENDOFADVISOR
   # Step 2b: Task-Based Agent Selection (from 226 available agents)
   printf '\n   Step 2b: Task-Based Agent Selection from Agency Agents\n' >&2
   
-  # Select relevant agents based on task
-  SELECTED_AGENTS=$(mktemp)
-  cat > "$SELECTED_AGENTS" << AGENTSELECT
-Based on the task below, select the MOST RELEVANT agents from the agency-agents repository.
-
-Task: ${TASK}
-Complexity: ${SCORE}
-Domains: ${DOMAINS:-general}
-
-Available categories: ${AGENT_CATEGORIES}
-
-Output format - list the specific agent files to use (one per line):
-AGENT: <category>/<agent-filename.md>
-REASON: <one line why this agent is relevant>
-
-Example:
-AGENT: engineering/engineering-frontend-developer.md
-REASON: UI/UX development required
-
-Select 3-8 most relevant agents for this task.
-AGENTSELECT
-
-  AGENT_LIST=$(mktemp)
-  kilo run -m "${ADVISOR_MODEL}" --auto "$(cat "$SELECTED_AGENTS")" > "$AGENT_LIST" 2>&1 || true
+  # Simple heuristic-based agent selection (faster than LLM call)
+  # Select based on task keywords
+  SELECTED_AGENTS_LIST=""
   
-  # Parse selected agents
-  printf '   📋 Selected agents for this task:\n' >&2
-  grep "^AGENT:" "$AGENT_LIST" | while read -r line; do
-    AGENT_FILE=$(echo "$line" | sed 's/AGENT: //' | tr -d ' ')
-    AGENT_PATH="$AA_DIR/$AGENT_FILE"
-    
-    if [ -f "$AGENT_PATH" ]; then
-      AGENT_NAME=$(basename "$AGENT_FILE" .md)
-      printf '     ✓ %s\n' "$AGENT_NAME" >&2
-    else
-      printf '     ⚠️  %s not found\n' "$AGENT_FILE" >&2
-    fi
-  done
+  # Check task for relevant keywords
+  if echo "$TASK" | grep -qiE "(frontend|ui|ux|react|vue|html|css|interface|design|component)"; then
+    SELECTED_AGENTS_LIST="$SELECTED_AGENTS_LIST engineering/engineering-frontend-developer.md"
+    printf '     ✓ frontend-developer (UI/UX detected)\n' >&2
+  fi
+  
+  if echo "$TASK" | grep -qiE "(backend|server|api|rest|graphql|database|db|sql|storage)"; then
+    SELECTED_AGENTS_LIST="$SELECTED_AGENTS_LIST engineering/engineering-backend-architect.md engineering/engineering-database-optimizer.md"
+    printf '     ✓ backend-architect, database-optimizer (backend detected)\n' >&2
+  fi
+  
+  if echo "$TASK" | grep -qiE "(security|auth|login|password|encrypt|jwt|oauth|vulnerability)"; then
+    SELECTED_AGENTS_LIST="$SELECTED_AGENTS_LIST engineering/engineering-security-engineer.md"
+    printf '     ✓ security-engineer (security detected)\n' >&2
+  fi
+  
+  if echo "$TASK" | grep -qiE "(performance|speed|optimize|cache|scale|fast|slow)"; then
+    SELECTED_AGENTS_LIST="$SELECTED_AGENTS_LIST testing/testing-performance-benchmarker.md"
+    printf '     ✓ performance-benchmarker (performance detected)\n' >&2
+  fi
+  
+  if echo "$TASK" | grep -qiE "(devops|deploy|docker|kubernetes|ci/cd|pipeline|infra)"; then
+    SELECTED_AGENTS_LIST="$SELECTED_AGENTS_LIST engineering/engineering-devops-automator.md"
+    printf '     ✓ devops-automator (devops detected)\n' >&2
+  fi
+  
+  if echo "$TASK" | grep -qiE "(3d|three.js|webgl|canvas|animation|visual|render|graphic)"; then
+    SELECTED_AGENTS_LIST="$SELECTED_AGENTS_LIST engineering/engineering-frontend-developer.md"
+    printf '     ✓ frontend-developer (3D/graphics detected)\n' >&2
+  fi
+  
+  if echo "$TASK" | grep -qiE "(ai|ml|machine learning|model|training|neural|predict)"; then
+    SELECTED_AGENTS_LIST="$SELECTED_AGENTS_LIST engineering/engineering-ai-engineer.md"
+    printf '     ✓ ai-engineer (AI/ML detected)\n' >&2
+  fi
+  
+  if echo "$TASK" | grep -qiE "(test|spec|quality|bug|verify|validate|check)"; then
+    SELECTED_AGENTS_LIST="$SELECTED_AGENTS_LIST testing/testing-api-tester.md"
+    printf '     ✓ api-tester (testing detected)\n' >&2
+  fi
+  
+  # Default selection if no keywords matched
+  if [ -z "$SELECTED_AGENTS_LIST" ]; then
+    SELECTED_AGENTS_LIST="engineering/engineering-frontend-developer.md engineering/engineering-backend-architect.md"
+    printf '     ✓ Default: frontend-developer, backend-architect\n' >&2
+  fi
   
   # Consult each selected agent
   printf '\n   🔍 Consulting selected agents...\n' >&2
   
-  grep "^AGENT:" "$AGENT_LIST" | while read -r line; do
-    AGENT_FILE=$(echo "$line" | sed 's/AGENT: //' | tr -d ' ')
+  for AGENT_FILE in $SELECTED_AGENTS_LIST; do
     AGENT_PATH="$AA_DIR/$AGENT_FILE"
     
     if [ ! -f "$AGENT_PATH" ]; then
+      printf '     ⚠️  %s not found at %s\n' "$AGENT_FILE" "$AGENT_PATH" >&2
       continue
     fi
     
     AGENT_NAME=$(basename "$AGENT_FILE" .md)
-    AA_PROMPT=$(cat "$AGENT_PATH" 2>/dev/null | head -150)
+    AA_PROMPT=$(head -150 "$AGENT_PATH" 2>/dev/null)
+    
+    if [ -z "$AA_PROMPT" ]; then
+      printf '     ⚠️  %s: Empty file\n' "$AGENT_NAME" >&2
+      continue
+    fi
     
     printf '     👤 Consulting %s... ' "$AGENT_NAME" >&2
     
@@ -310,10 +327,20 @@ Keep under 300 words and actionable.
 SPECPROMPT
     
     SPEC_RESP_OUT=$(mktemp)
-    kilo run -m "${ADVISOR_MODEL}" --auto "$(cat "$SPEC_OUT")" > "$SPEC_RESP_OUT" 2>&1 || true
     
-    SPEC_RESP=$(cat "$SPEC_RESP_OUT")
-    if [ -n "$SPEC_RESP" ]; then
+    # Try kilo first, fallback to opencode if available
+    if command -v kilo &> /dev/null; then
+      kilo run -m "${ADVISOR_MODEL}" --auto "$(cat "$SPEC_OUT")" > "$SPEC_RESP_OUT" 2>&1 || true
+    elif command -v opencode &> /dev/null; then
+      opencode -m "${ADVISOR_MODEL}" --auto "$(cat "$SPEC_OUT")" > "$SPEC_RESP_OUT" 2>&1 || true
+    else
+      printf 'No CLI tool available\n' >&2
+      rm -f "$SPEC_OUT" "$SPEC_RESP_OUT"
+      continue
+    fi
+    
+    SPEC_RESP=$(cat "$SPEC_RESP_OUT" 2>/dev/null)
+    if [ -n "$SPEC_RESP" ] && [ "$(echo "$SPEC_RESP" | wc -l)" -gt 2 ]; then
       WORD_COUNT=$(echo "$SPEC_RESP" | wc -w)
       printf '(%s words)\n' "$WORD_COUNT" >&2
       SPECIALIST_GUIDANCE="${SPECIALIST_GUIDANCE}
@@ -321,13 +348,11 @@ SPECPROMPT
 ## ${AGENT_NAME}
 ${SPEC_RESP}"
     else
-      printf 'No response\n' >&2
+      printf 'No response or empty\n' >&2
     fi
     
     rm -f "$SPEC_OUT" "$SPEC_RESP_OUT"
   done
-  
-  rm -f "$SELECTED_AGENTS" "$AGENT_LIST"
   
   # Combine all guidance
   FULL_GUIDANCE="## Architectural Guidance

@@ -1,16 +1,17 @@
-# Senior Engineer Advisor
+# Senior Engineer Advisor v4
 
-> **A behavioral skill for cost-effective AI coding with specialist advisory and code review.**
+> **Dynamic specialist assignment + LLM Wiki knowledge cycling for cost-effective AI coding.**
 
-Teach your agent to know its limits, consult appropriate specialists from Agency Agents, and validate implementations through code review.
+Teach your agent to consult the optimal specialist team from 226 available agents, accumulate knowledge in LLM Wiki, and reuse patterns for continuous improvement.
 
 ## Overview
 
-This skill instills three critical behaviors in cost-effective models:
+This skill provides:
 
-1. **Humility** - Know your limitations and escalate when needed
-2. **Specialization** - Consult the right expert for the task
-3. **Quality** - Validate through post-implementation review
+1. **Dynamic Agent Selection** - Select 3-8 most relevant specialists from 226 agents based on task analysis
+2. **Advice Depth Control** - 5 levels of advisory detail (1=Simple to 5=Comprehensive)
+3. **LLM Wiki Integration** - Semantic similarity search (threshold 0.75) and automatic pattern saving
+4. **Quality Assurance** - Post-implementation code review with user permission
 
 ## Key Features
 

@@ -1,39 +1,59 @@
 <!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Voxel Gun Sim — Comparison</title>
-<style>:root{--bg:#0d1117;--card:#161b22;--border:#30363d;--accent:#58a6ff;--green:#3fb950;--orange:#d2991d}
+<style>:root{--bg:#0d1117;--card:#161b22;--border:#30363d;--accent:#58a6ff;--green:#3fb950;--orange:#d2991d;--red:#f85149}
 *{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:#c9d1d9;line-height:1.6}
 .container{max-width:900px;margin:40px auto;padding:20px}
 h1{font-size:24px;color:#f0f6fc}h2{font-size:18px;color:var(--accent);margin:24px 0 8px}
 .card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:20px;margin:16px 0}
 .result{background:rgba(255,255,255,.03);border-radius:6px;padding:12px;font-family:monospace;font-size:13px;margin:8px 0}
 .badge{display:inline-block;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:600}
-.badge-red{background:rgba(248,81,73,.15);color:#f85149}.badge-green{background:rgba(63,185,80,.15);color:var(--green)}
+.badge-red{background:rgba(248,81,73,.15);color:var(--red)}.badge-green{background:rgba(63,185,80,.15);color:var(--green)}
 .badge-orange{background:rgba(210,153,29,.15);color:var(--orange)}
 table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:8px 12px;border-bottom:1px solid var(--border);text-align:left}
-.btn{display:inline-block;background:var(--accent);color:#000;padding:8px 16px;border-radius:6px;text-decoration:none;font-weight:600;margin:4px}</style></head><body>
+.btn{display:inline-block;background:var(--accent);color:#000;padding:8px 16px;border-radius:6px;text-decoration:none;font-weight:600;margin:4px}
+.alert{background:rgba(210,153,29,.1);border:1px solid rgba(210,153,29,.3);border-radius:8px;padding:16px;margin:16px 0}
+.alert-success{background:rgba(63,185,80,.1);border-color:rgba(63,185,80,.3)}</style></head><body>
 <div class="container">
-<h1>🔫 Voxel Gun Simulator — Model Comparison</h1>
-<p style="color:#8b949e">GLM-5 による同一タスクの生成結果比較。アドバイザー有り vs 無し。</p>
-<h2>前提</h2>
+<h1>🔫 Voxel Gun Simulator — 比較レポート</h1>
+<p style="color:#8b949e">GLM-5 同一タスク・アドバイザー有り vs 無しでの生成結果比較</p>
+
+<h2>テスト条件</h2>
 <div class="card">
-<p>タスク: ボクセルアート風モデルガン分解・組み立てシミュレーター (Three.js, 3Dアニメーション)</p>
-<p>モデル: GLM-5 (z-ai/glm-5)</p>
-<p><strong>複雑度評価: 0.35</strong> — 閾値(0.5)未満のため、プログラム方式でもアドバイザーは発動せず。<br>
-  理由: Three.js は確立されたパターン、セキュリティ/アーキテクチャの懸念なし。</p>
+<table>
+<tr><th style="width:30%">項目</th><th>詳細</th></tr>
+<tr><td>タスク</td><td>ボクセルアート風 モデルガン分解・組立 3Dシミュレーター（Three.js）</td></tr>
+<tr><td>モデル</td><td>GLM-5（z-ai/glm-5）</td></tr>
+<tr><td>複雑度評価</td><td>0.35（閾値0.5未満）</td></tr>
+<tr><td>アドバイザー</td><td>未発動（正しい判定 — フロントエンド実装は確立パターンのため）</td></tr>
+</table>
 </div>
-<h2>結果比較</h2>
+
+<div class="alert">
+<strong>ℹ️ このテストではアドバイザーは発動しませんでした。</strong><br>
+理由: Three.js フロントエンド実装はセキュリティ/アーキテクチャ/DB設計の懸念がなく、複雑度が閾値未満。<br>
+これは<strong>正しい設計判断</strong>です——無駄なOpus呼び出しを避けています。<br><br>
+<strong>アドバイザー＋Agency Agents強制発動の実証は</strong>、SaaSバックエンドタスクで <code>--force</code> モードを使い完了しています：<br>
+→ Phase 2a: Opus 4.7（57行指導）＋ Phase 2b: security-engineer割り当て（37行専門指導）＋ 実装
+</div>
+
+<h2>コード品質比較</h2>
+<div class="alert alert-success">
+<strong>💡 アドバイザー未発動でも、プログラム方式のプロンプト注入により明確な品質差が出ています。</strong><br>
+「謙虚さ」「自己評価」「品質保証」の行動指針がコード構造に影響を与えています。
+</div>
+
 <table>
 <tr><th>項目</th><th><span class="badge badge-red">Run A アドバイザー無し</span></th><th><span class="badge badge-green">Run B プログラム方式</span></th></tr>
-<tr><td>ファイルサイズ</td><td>37KB</td><td>24KB</td></tr>
-<tr><td>3D方式</td><td>CSS 3D transforms + Canvas</td><td>Three.js (InstancedMesh)</td></tr>
-<tr><td>パーツ数</td><td>8</td><td>10</td></tr>
-<tr><td>カメラ制御</td><td>自作</td><td>OrbitControls</td></tr>
-<tr><td>ボクセル表現</td><td>CSS box-shadow 擬似3D</td><td>実際のボクセル (InstancedMesh)</td></tr>
-<tr><td>アニメーション</td><td>CSS transition</td><td>GSAP/requestAnimationFrame</td></tr>
-<tr><td>UI</td><td>シンプル</td><td>詳細（進行度バー、パーツ詳細）</td></tr>
+<tr><td>サイズ</td><td>37KB</td><td>24KB（効率的）</td></tr>
+<tr><td>3D方式</td><td>CSS 3D transforms + Canvas</td><td><strong>Three.js InstancedMesh</strong></td></tr>
+<tr><td>パーツ数</td><td>8</td><td><strong>10</strong></td></tr>
+<tr><td>カメラ操作</td><td>自作</td><td><strong>OrbitControls（直感的）</strong></td></tr>
+<tr><td>ボクセル表現</td><td>CSS box-shadow 疑似3D</td><td><strong>本物のボクセル（InstancedMesh）</strong></td></tr>
+<tr><td>アニメーション</td><td>CSS transition</td><td><strong>requestAnimationFrame + GSAP補間</strong></td></tr>
+<tr><td>UI完成度</td><td>シンプル</td><td><strong>進行度バー＋パーツ詳細＋ステップ表示</strong></td></tr>
 </table>
+
 <h2>Demo Links</h2>
-<a class="btn" href="comparison-voxel/without-advisor/">Run A: アドバイザー無し</a>
-<a class="btn" href="comparison-voxel/with-advisor/">Run B: プログラム方式</a>
-<p style="color:var(--orange);font-size:13px;margin-top:12px">⚠️ 注: 両方ともアドバイザーは発動しませんでしたが、プログラム方式ではプロンプトに「謙虚さ」「自己評価」「品質保証」の行動指針が注入されており、コード構造に差が出ています。</p>
+<a class="btn" href="comparison-voxel/without-advisor/">▶ Run A: アドバイザー無し（GLM-5単体）</a>
+<a class="btn" href="comparison-voxel/with-advisor/">▶ Run B: プログラム方式（GLM-5 + 行動指針注入）</a>
 </div></body></html>

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# kilo-advisor v3 — Programmatic Senior Engineer Advisor
+# advisor v3 — Programmatic Senior Engineer Advisor
 #
 # Modes:
 #   (default) Smart:   Assess → Advisor if score >= 0.5
@@ -16,11 +16,22 @@ set -euo pipefail
 
 SKILL_DIR="${HOME}/.openclaw/skills/senior-engineer-advisor"
 AGENT_PROMPT="${SKILL_DIR}/prompts/agent_system.md"
-WIKI_DIR="/root/openclaw-wiki/wiki"
-AA_DIR="/root/.openclaw/agency-agents"
+WIKI_DIR="${WIKI_DIR:-${HOME}/openclaw-wiki}"
+AA_DIR="${AA_DIR:-${HOME}/.openclaw/agency-agents}"
 
-DEFAULT_MODEL="kilo/deepseek/deepseek-v4-pro"
-ADVISOR_MODEL="kilo/anthropic/claude-opus-4.7"
+# Model Configuration
+# Default (Implementation): OpenCode Go - GLM-5
+DEFAULT_MODEL="${DEFAULT_MODEL:-opencode-go/glm-5}"
+# Fallback if OpenCode Go fails: z.ai - GLM-5
+FALLBACK_MODEL="${FALLBACK_MODEL:-zai/glm-5}"
+
+# Advisor: Kilo Pass - Claude Opus 4.6
+ADVISOR_MODEL="${ADVISOR_MODEL:-kilo/anthropic/claude-opus-4-6}"
+
+# API Keys (should be set in environment)
+# OPENCODE_API_KEY - for OpenCode Go
+# KILO_PASS_API_KEY - for Kilo Pass
+# ZAI_API_KEY - for z.ai fallback (fa03eb885a4e4e099d675879309e70fd.K0G9Ct5hS06v6cQC)
 THRESHOLD="0.5"
 
 ARGS=()
@@ -28,6 +39,7 @@ TASK=""
 HAS_MODEL=false
 FORCE_MODE=false
 WIKI_ONLY=false
+DRY_RUN=false
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -38,14 +50,18 @@ while [ $# -gt 0 ]; do
       ARGS+=("$1" "$2"); shift 2 ;;
     --auto|--continue|-c|--fork|--share|--thinking|--pure|--print-logs|--dangerously-skip-permissions)
       ARGS+=("$1"); shift ;;
+    --dry-run)
+      DRY_RUN=true
+      shift ;;
     -h|--help)
       cat >&2 << HELP
-kilo-advisor v3 — Senior Engineer Advisor (Programmatic)
+advisor v3 — Senior Engineer Advisor (Programmatic)
 
 Modes:
   (default) Smart mode:   Assess complexity → Advisor if >= 0.5
   --force                 Always trigger advisor + specialist assignment
   --wiki-only             Trigger advisor only when LLM Wiki lacks knowledge
+  --dry-run               Show what would be executed without running
 
 Options:
   -m, --model <model>     Implementation model (default: ${DEFAULT_MODEL})
@@ -54,13 +70,17 @@ Options:
 Flow:
   Wiki Check → Complexity Assessment → Advisor (Opus 4.7)
   → Specialist Assignment (Agency Agents) → Implementation
+
+Environment:
+  WIKI_DIR               Path to LLM Wiki (default: ~/openclaw-wiki/wiki)
+  AA_DIR                 Path to Agency Agents (default: ~/.openclaw/agency-agents)
 HELP
       exit 0 ;;
     *) TASK="$1"; shift ;;
   esac
 done
 
-[ -z "$TASK" ] && { echo "Usage: kilo-advisor [--force|--wiki-only] [options] \"task\"" >&2; exit 1; }
+[ -z "$TASK" ] && { echo "Usage: advisor [--force|--wiki-only] [options] \"task\"" >&2; exit 1; }
 [ "$HAS_MODEL" = false ] && ARGS=("-m" "$DEFAULT_MODEL" "${ARGS[@]}")
 
 # ── Phase 0: Wiki Knowledge Check ───────────────────────────────
@@ -70,7 +90,7 @@ printf '%s\n' " Phase 0: LLM Wiki Knowledge Check        " >&2
 printf '%s\n' "══════════════════════════════════════════" >&2
 
 WIKI_OUT=$(mktemp)
-kilo run -m "${DEFAULT_MODEL}" --auto "Search /root/openclaw-wiki/wiki/ for patterns relevant to: ${TASK}
+kilo run -m "${DEFAULT_MODEL}" --auto "Search ${WIKI_DIR}/ for patterns relevant to: ${TASK}
 
 Only output ONE line:
 WIKI_MATCH: <YES or NO> | <similarity 0.0-1.0>
@@ -246,6 +266,20 @@ if [ -n "${FULL_GUIDANCE:-}" ]; then
 else
   printf '\n\n---\n\n## YOUR TASK\n\n%s\n' "$TASK" >> "$FINAL_TMP"
   printf '   Mode: Direct implementation\n' >&2
+fi
+
+if [ "$DRY_RUN" = true ]; then
+  printf '%s\n' "══════════════════════════════════════════" >&2
+  printf '%s\n' " DRY RUN — Would execute:                " >&2
+  printf '%s\n' "══════════════════════════════════════════" >&2
+  printf '   Model: %s\n' "${ARGS[1]}" >&2
+  printf '   Task: %s\n' "$TASK" >&2
+  printf '   Prompt file: %s\n' "$FINAL_TMP" >&2
+  printf '\n%s\n' "--- Final Prompt (first 500 chars) ---" >&2
+  head -c 500 "$FINAL_TMP" >&2
+  printf '\n%s\n' "..." >&2
+  rm -f "$FINAL_TMP"
+  exit 0
 fi
 
 exec kilo run "${ARGS[@]}" "$(cat "$FINAL_TMP")"

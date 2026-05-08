@@ -10,6 +10,10 @@ advisor:
     model: "kilo/anthropic/claude-opus-4.7"
     provider: "kilo"
     max_tokens: 800
+  
+  # Advice Depth: 1-5 (controls level of detail from advisor)
+  # 1=Simple, 2=General, 3=Standard, 4=Detailed, 5=Comprehensive
+  advice_depth: 3
 
   agency_agents:
     enabled: true

@@ -27,9 +27,8 @@ ADVISOR_MODEL="${ADVISOR_MODEL:-kilo/anthropic/claude-opus-4-6}"
 
 # Constants
 THRESHOLD="0.5"
-# Available specialists from agency-agents (files that actually exist)
-ALL_SPECIALISTS="security database devops frontend backend ml"
-# Note: api and performance specialists don't exist in agency-agents, omitted per JUN's instruction
+# All 8 specialists from agency-agents (226 total agents available)
+ALL_SPECIALISTS="security database api performance devops frontend backend ml"
 
 # Advisor Depth Setting (1-5)
 # 1=Simple, 2=General, 3=Standard, 4=Detailed, 5=Comprehensive
@@ -218,13 +217,13 @@ ENDOFADVISOR
   
   for STYPE in $ALL_SPECIALISTS; do
     # Map specialist type to CORRECT agency-agents path
-    # Using msitarzewski/agency-agents structure: engineering/engineering-{role}.md
+    # Using msitarzewski/agency-agents structure (226 agents across all categories)
     AA_FILE=""
     case "$STYPE" in
       security) AA_FILE="$AA_DIR/engineering/engineering-security-engineer.md" ;;
       database) AA_FILE="$AA_DIR/engineering/engineering-database-optimizer.md" ;;
-      api) AA_FILE="$AA_DIR/engineering/engineering-api-designer.md" ;;
-      performance) AA_FILE="$AA_DIR/engineering/engineering-performance-engineer.md" ;;
+      api) AA_FILE="$AA_DIR/testing/testing-api-tester.md" ;;
+      performance) AA_FILE="$AA_DIR/testing/testing-performance-benchmarker.md" ;;
       devops) AA_FILE="$AA_DIR/engineering/engineering-devops-automator.md" ;;
       frontend) AA_FILE="$AA_DIR/engineering/engineering-frontend-developer.md" ;;
       backend) AA_FILE="$AA_DIR/engineering/engineering-backend-architect.md" ;;

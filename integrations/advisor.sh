@@ -27,7 +27,9 @@ ADVISOR_MODEL="${ADVISOR_MODEL:-kilo/anthropic/claude-opus-4-6}"
 
 # Constants
 THRESHOLD="0.5"
-ALL_SPECIALISTS="security database api performance devops frontend backend ml"
+# Available specialists from agency-agents (files that actually exist)
+ALL_SPECIALISTS="security database devops frontend backend ml"
+# Note: api and performance specialists don't exist in agency-agents, omitted per JUN's instruction
 
 # Advisor Depth Setting (1-5)
 # 1=Simple, 2=General, 3=Standard, 4=Detailed, 5=Comprehensive

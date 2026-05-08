@@ -1,0 +1,55 @@
+# Senior Engineer Advisor — Configuration
+# Environment: KiloClaw / KiloCode
+
+agent:
+  model: "kilo/deepseek/deepseek-v4-pro"
+  provider: "kilo"
+
+advisor:
+  general:
+    model: "kilo/anthropic/claude-opus-4.7"
+    provider: "kilo"
+    max_tokens: 800
+
+  agency_agents:
+    enabled: true
+    specialists:
+      security:
+        model: "kilo/anthropic/claude-opus-4.7"
+        description: "Security Architect"
+      database:
+        model: "kilo/anthropic/claude-opus-4.7"
+        description: "Database Expert"
+      api:
+        model: "kilo/anthropic/claude-opus-4.7"
+        description: "API Designer"
+      performance:
+        model: "kilo/anthropic/claude-opus-4.7"
+        description: "Performance Engineer"
+      devops:
+        model: "kilo/anthropic/claude-opus-4.7"
+        description: "DevOps Specialist"
+      frontend:
+        model: "kilo/anthropic/claude-opus-4.7"
+        description: "Frontend Architect"
+      backend:
+        model: "kilo/anthropic/claude-opus-4.7"
+        description: "Backend Architect"
+      ml:
+        model: "kilo/anthropic/claude-opus-4.7"
+        description: "ML Engineer"
+
+code_review:
+  enabled: true
+  require_permission: true
+  reviewer_model: "kilo/anthropic/claude-opus-4.7"
+  trigger_on:
+    - "user_dissatisfied"
+    - "bug_reported"
+    - "high_complexity"
+
+knowledge:
+  llm_wiki:
+    enabled: true
+    path: "/root/openclaw-wiki"
+    auto_save: true

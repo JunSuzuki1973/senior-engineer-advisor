@@ -215,26 +215,27 @@ ENDOFADVISOR
   printf '\n   Step 2b: MANDATORY - All 8 Agency Agents Specialists\n' >&2
   
   for STYPE in $ALL_SPECIALISTS; do
-    # Map specialist type to directory
-    AADIR=""
+    # Map specialist type to CORRECT agency-agents path
+    # Using msitarzewski/agency-agents structure: engineering/engineering-{role}.md
+    AA_FILE=""
     case "$STYPE" in
-      security) AADIR="$AA_DIR/security-engineer" ;;
-      database) AADIR="$AA_DIR/database-optimizer" ;;
-      api) AADIR="$AA_DIR/api-tester" ;;
-      performance) AADIR="$AA_DIR/performance-benchmarker" ;;
-      devops) AADIR="$AA_DIR/devops-automator" ;;
-      frontend) AADIR="$AA_DIR/frontend-developer" ;;
-      backend) AADIR="$AA_DIR/backend-architect" ;;
-      ml) AADIR="$AA_DIR/ml-engineer" ;;
+      security) AA_FILE="$AA_DIR/engineering/engineering-security-engineer.md" ;;
+      database) AA_FILE="$AA_DIR/engineering/engineering-database-optimizer.md" ;;
+      api) AA_FILE="$AA_DIR/engineering/engineering-api-designer.md" ;;
+      performance) AA_FILE="$AA_DIR/engineering/engineering-performance-engineer.md" ;;
+      devops) AA_FILE="$AA_DIR/engineering/engineering-devops-automator.md" ;;
+      frontend) AA_FILE="$AA_DIR/engineering/engineering-frontend-developer.md" ;;
+      backend) AA_FILE="$AA_DIR/engineering/engineering-backend-architect.md" ;;
+      ml) AA_FILE="$AA_DIR/engineering/engineering-ai-engineer.md" ;;
     esac
     
-    # Load AGENTS.md if exists
+    # Load specialist definition if exists
     AA_PROMPT=""
-    if [ -n "$AADIR" ] && [ -f "$AADIR/AGENTS.md" ]; then
-      AA_PROMPT=$(cat "$AADIR/AGENTS.md" 2>/dev/null | head -100)
+    if [ -n "$AA_FILE" ] && [ -f "$AA_FILE" ]; then
+      AA_PROMPT=$(cat "$AA_FILE" 2>/dev/null | head -150)
       printf '     👤 %s: ' "$STYPE" >&2
     else
-      printf '     ⚠️  %s: No AGENTS.md found\n' "$STYPE" >&2
+      printf '     ⚠️  %s: %s not found\n' "$STYPE" "$(basename "$AA_FILE")" >&2
       continue
     fi
     

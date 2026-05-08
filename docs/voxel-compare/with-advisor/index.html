@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>モデルガン分解シミュレーター</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+      overflow: hidden; 
+      background: #1a1a2e; 
+      font-family: 'Segoe UI', sans-serif;
+    }
+    #canvas { display: block; width: 100vw; height: 100vh; }
+    
+    #hud {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      background: rgba(0,0,0,0.7);
+      color: #fff;
+      padding: 8px 14px;
+      border-radius: 4px;
+      font-size: 14px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    #hud.visible { opacity: 1; }
+    
+    #controls {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      background: rgba(0,0,0,0.6);
+      padding: 16px 24px;
+      border-radius: 8px;
+    }
+    
+    .btn-row {
+      display: flex;
+      gap: 10px;
+    }
+    
+    button {
+      padding: 10px 24px;
+      font-size: 16px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      background: #4a4e69;
+      color: #fff;
+      transition: background 0.2s, transform 0.1s;
+    }
+    button:hover { background: #6c757d; }
+    button:active { transform: scale(0.96); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    
+    #slider-container {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #fff;
+      font-size: 14px;
+    }
+    
+    #progress-slider {
+      width: 200px;
+      cursor: pointer;
+    }
+    
+    #progress-value {
+      min-width: 40px;
+      text-align: right;
+    }
+    
+    #hint {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      background: rgba(0,0,0,0.5);
+      color: #aaa;
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+  </style>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  <div id="hud"></div>
+  <div id="hint">Space: 切り替え / ドラッグ: 回転</div>
+  <div id="controls">
+    <div class="btn-row">
+      <button id="btn-disassemble">分解</button>
+      <button id="btn-assemble">組立</button>
+    </div>
+    <div id="slider-container">
+      <span>進度:</span>
+      <input type="range" id="progress-slider" min="0" max="100" value="0">
+      <span id="progress-value">0%</span>
+    </div>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    const isMobile = window.matchMedia('(pointer: coarse)').matches;
+    const pixelRatio = Math.min(window.devicePixelRatio, isMobile ? 1.5 : 2);
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x1a1a2e);
+
+    const canvas = document.getElementById('canvas');
+    const renderer = new THREE.WebGLRenderer({ 
+      canvas, 
+      antialias: !isMobile 
+    });
+    renderer.setPixelRatio(pixelRatio);
+    renderer.setSize(window.innerWidth, window.innerHeight);
+
+    const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(20, 12, 25);
+
+    const controls = new OrbitControls(camera, canvas);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.target.set(0, 2, 0);
+
+    const ambient = new THREE.AmbientLight(0xffffff, 0.4);
+    scene.add(ambient);
+
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+    dirLight.position.set(10, 20, 10);
+    scene.add(dirLight);
+
+    const hemiLight = new THREE.HemisphereLight(0x8888ff, 0x444422, 0.3);
+    scene.add(hemiLight);
+
+    const COLORS = {
+      frame: 0x2d3436,
+      slide: 0x3d3d3d,
+      barrel: 0x4a4a4a,
+      grip: 0x8b5a2b,
+      trigger: 0x1a1a1a,
+      magazine: 0xb8860b,
+      recoilSpring: 0x636e72
+    };
+
+    const PART_NAMES = {
+      frame: 'フレーム',
+      slide: 'スライド',
+      barrel: 'バレル',
+      grip: 'グリップ',
+      trigger: 'トリガー',
+      magazine: 'マガジン',
+      recoilSpring: 'リコイルスプリング'
+    };
+
+    const PART_DELAY = {
+      barrel: 0,
+      slide: 0.08,
+      recoilSpring: 0.16,
+      frame: 0.24,
+      trigger: 0.32,
+      magazine: 0.40,
+      grip: 0.48
+    };
+
+    const parts = {};
+    const instancedParts = [];
+
+    function createVoxelData() {
+      return {
+        frame: [
+          { pos: [0,0,0], size: [4,3,10] },
+          { pos: [-1,0,2], size: [2,3,6] },
+          { pos: [0,3,1], size: [2,2,4] },
+          { pos: [0,0,10], size: [2,4,2] },
+        ],
+        slide: [
+          { pos: [0,5,0], size: [5,2,12] },
+          { pos: [0,7,1], size: [4,1,8] },
+          { pos: [0,5,12], size: [3,3,3] },
+        ],
+        barrel: [
+          { pos: [0,5,-6], size: [2,2,8] },
+          { pos: [0,6,-8], size: [1,1,4] },
+        ],
+        grip: [
+          { pos: [-1,-5,6], size: [3,6,4] },
+          { pos: [-1,-5,3], size: [2,5,3] },
+        ],
+        trigger: [
+          { pos: [1,0,5], size: [1,3,2] },
+          { pos: [2,0,4], size: [1,2,1] },
+        ],
+        magazine: [
+          { pos: [0,-3,6], size: [2,5,3] },
+          { pos: [0,-2,9], size: [1,3,1] },
+        ],
+        recoilSpring: [
+          { pos: [0,4,3], size: [2,1,5] },
+          { pos: [0,4,8], size: [1,1,2] },
+        ]
+      };
+    }
+
+    function buildPartInstanced(name, voxelBoxes, color) {
+      let totalVoxels = 0;
+      voxelBoxes.forEach(box => {
+        totalVoxels += box.size[0] * box.size[1] * box.size[2];
+      });
+
+      const geometry = new THREE.BoxGeometry(1, 1, 1);
+      const material = new THREE.MeshLambertMaterial({ color });
+      const mesh = new THREE.InstancedMesh(geometry, material, totalVoxels);
+      mesh.name = name;
+
+      const matrix = new THREE.Matrix4();
+      const colorObj = new THREE.Color(color);
+      const colorVariation = new THREE.Color();
+      let idx = 0;
+
+      voxelBoxes.forEach(box => {
+        for (let x = 0; x < box.size[0]; x++) {
+          for (let y = 0; y < box.size[1]; y++) {
+            for (let z = 0; z < box.size[2]; z++) {
+              const px = box.pos[0] + x - 2;
+              const py = box.pos[1] + y + 2;
+              const pz = box.pos[2] + z - 5;
+              matrix.setPosition(px, py, pz);
+              mesh.setMatrixAt(idx, matrix);
+              
+              colorVariation.copy(colorObj);
+              colorVariation.offsetHSL(0, 0, (Math.random() - 0.5) * 0.08);
+              mesh.setColorAt(idx, colorVariation);
+              idx++;
+            }
+          }
+        }
+      });
+
+      mesh.instanceMatrix.needsUpdate = true;
+      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+
+      const group = new THREE.Group();
+      group.add(mesh);
+      group.userData.name = name;
+      
+      return { group, mesh };
+    }
+
+    function initParts() {
+      const voxelData = createVoxelData();
+      
+      Object.entries(voxelData).forEach(([name, boxes]) => {
+        const { group, mesh } = buildPartInstanced(name, boxes, COLORS[name]);
+        
+        group.userData.assembledPos = new THREE.Vector3(0, 0, 0);
+        group.userData.assembledRot = new THREE.Euler(0, 0, 0);
+        
+        const displaceDir = getDisplacementDirection(name);
+        const dist = getDisplacementDistance(name);
+        group.userData.disassembledPos = displaceDir.clone().multiplyScalar(dist);
+        group.userData.disassembledRot = new THREE.Euler(
+          displaceDir.x * 0.2,
+          displaceDir.y * 0.3,
+          displaceDir.z * 0.1
+        );
+        
+        parts[name] = group;
+        instancedParts.push(mesh);
+        scene.add(group);
+      });
+    }
+
+    function getDisplacementDirection(name) {
+      const dirs = {
+        barrel: new THREE.Vector3(0, 0, -1),
+        slide: new THREE.Vector3(0, 1, -0.5),
+        recoilSpring: new THREE.Vector3(0, 1.5, -0.3),
+        frame: new THREE.Vector3(0, 0, 0.5),
+        trigger: new THREE.Vector3(1, -0.5, 0.5),
+        magazine: new THREE.Vector3(0, -2, 0),
+        grip: new THREE.Vector3(-0.5, -1, 0.8)
+      };
+      return dirs[name] || new THREE.Vector3(0, 1, 0);
+    }
+
+    function getDisplacementDistance(name) {
+      const dists = {
+        barrel: 8,
+        slide: 6,
+        recoilSpring: 5,
+        frame: 3,
+        trigger: 4,
+        magazine: 6,
+        grip: 5
+      };
+      return dists[name] || 4;
+    }
+
+    let progress = 0;
+    let targetProgress = 0;
+    let animating = false;
+    const animSpeed = 0.8;
+
+    function easeInOutCubic(t) {
+      return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    }
+
+    function updatePartPositions() {
+      Object.entries(parts).forEach(([name, group]) => {
+        const delay = PART_DELAY[name];
+        const localT = Math.max(0, Math.min(1, (progress - delay) / (1 - delay * 0.8)));
+        const easedT = easeInOutCubic(localT);
+        
+        group.position.lerpVectors(
+          group.userData.assembledPos,
+          group.userData.disassembledPos,
+          easedT
+        );
+        
+        group.rotation.x = THREE.MathUtils.lerp(
+          group.userData.assembledRot.x,
+          group.userData.disassembledRot.x,
+          easedT
+        );
+        group.rotation.y = THREE.MathUtils.lerp(
+          group.userData.assembledRot.y,
+          group.userData.disassembledRot.y,
+          easedT
+        );
+        group.rotation.z = THREE.MathUtils.lerp(
+          group.userData.assembledRot.z,
+          group.userData.disassembledRot.z,
+          easedT
+        );
+      });
+    }
+
+    function setProgress(value) {
+      progress = value;
+      targetProgress = value;
+      updatePartPositions();
+      updateUI();
+    }
+
+    function animateTo(target) {
+      targetProgress = target;
+      animating = true;
+    }
+
+    function updateUI() {
+      const pct = Math.round(progress * 100);
+      document.getElementById('progress-slider').value = pct;
+      document.getElementById('progress-value').textContent = pct + '%';
+      
+      document.getElementById('btn-disassemble').disabled = progress >= 1;
+      document.getElementById('btn-assemble').disabled = progress <= 0;
+    }
+
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+    const hud = document.getElementById('hud');
+
+    function onPointerMove(event) {
+      const rect = canvas.getBoundingClientRect();
+      pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+    }
+
+    function checkHover() {
+      raycaster.setFromCamera(pointer, camera);
+      const intersects = raycaster.intersectObjects(instancedParts);
+      
+      if (intersects.length > 0) {
+        const name = intersects[0].object.name;
+        hud.textContent = PART_NAMES[name];
+        hud.classList.add('visible');
+      } else {
+        hud.classList.remove('visible');
+      }
+    }
+
+    document.getElementById('btn-disassemble').addEventListener('click', () => animateTo(1));
+    document.getElementById('btn-assemble').addEventListener('click', () => animateTo(0));
+    
+    document.getElementById('progress-slider').addEventListener('input', (e) => {
+      setProgress(parseInt(e.target.value) / 100);
+    });
+
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Space') {
+        e.preventDefault();
+        animateTo(progress < 0.5 ? 1 : 0);
+      }
+    });
+
+    canvas.addEventListener('pointermove', onPointerMove);
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    initParts();
+    updateUI();
+
+    let lastHoverCheck = 0;
+    function animate(time) {
+      requestAnimationFrame(animate);
+      
+      if (animating) {
+        const diff = targetProgress - progress;
+        if (Math.abs(diff) < 0.001) {
+          progress = targetProgress;
+          animating = false;
+        } else {
+          progress += diff * Math.min(0.05, animSpeed * 0.016);
+        }
+        updatePartPositions();
+        updateUI();
+      }
+      
+      if (time - lastHoverCheck > 50) {
+        checkHover();
+        lastHoverCheck = time;
+      }
+      
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    animate(0);
+  </script>
+</body>
+</html>

@@ -27,8 +27,8 @@ ADVISOR_MODEL="${ADVISOR_MODEL:-kilo/anthropic/claude-opus-4-6}"
 
 # Constants
 THRESHOLD="0.5"
-# All 8 specialists from agency-agents (226 total agents available)
-ALL_SPECIALISTS="security database api performance devops frontend backend ml"
+# Available agent categories from agency-agents (226 total agents)
+AGENT_CATEGORIES="engineering testing product design marketing sales strategy finance game-development spatial-computing project-management support specialized academic integrations"
 
 # Advisor Depth Setting (1-5)
 # 1=Simple, 2=General, 3=Standard, 4=Detailed, 5=Comprehensive
@@ -75,38 +75,64 @@ fi
 [ "$HAS_MODEL" = false ] && ARGS=("-m" "$DEFAULT_MODEL" "${ARGS[@]}")
 
 # ═══════════════════════════════════════════════════════════════
-# Phase 0: Wiki Knowledge Check
+# Phase 0: LLM Wiki Knowledge Retrieval (LLM Wiki Philosophy)
 # ═══════════════════════════════════════════════════════════════
 printf '\n%s\n' "═══════════════════════════════════════════════════════════════"
-printf '%s\n' " Phase 0: LLM Wiki Knowledge Check"
+printf '%s\n' " Phase 0: LLM Wiki Knowledge Retrieval"
 printf '%s\n' "═══════════════════════════════════════════════════════════════"
 
 WIKI_MATCH=false
 WIKI_CONTENT=""
+SIMILARITY="0.0"
 
-if [ -d "$WIKI_DIR" ]; then
-  WIKI_OUT=$(mktemp)
-  kilo run -m "${DEFAULT_MODEL}" --auto "Search ${WIKI_DIR}/ for patterns relevant to: ${TASK}
-
-Output format:
-WIKI_MATCH: <YES or NO> | <similarity 0.0-1.0>
-PATTERN_ID: <pattern filename if YES, else NONE>
-SUMMARY: <one line description if YES, else NONE>" > "$WIKI_OUT" 2>&1 || true
-
-  WIKI_RESULT=$(grep -i "WIKI_MATCH:" "$WIKI_OUT" | tail -1 || echo "WIKI_MATCH: NO | 0.0")
-  printf '   📚 %s\n' "$WIKI_RESULT" >&2
+if [ -d "${WIKI_DIR}/patterns" ]; then
+  printf '   🔍 Searching patterns in LLM Wiki...\n' >&2
   
-  if echo "$WIKI_RESULT" | grep -q "YES"; then
+  WIKI_OUT=$(mktemp)
+  kilo run -m "${DEFAULT_MODEL}" --auto "Search ${WIKI_DIR}/patterns/ for relevant knowledge to:
+
+TASK: ${TASK}
+
+Instructions:
+1. Read pattern files in ${WIKI_DIR}/patterns/
+2. Calculate semantic similarity to the task
+3. Return best match if similarity >= 0.75
+
+Output EXACTLY:
+SIMILARITY: <0.00-1.00>
+PATTERN_ID: <filename or NONE>
+RELEVANCE: <one line explanation or NONE>
+
+If no pattern >= 0.75 similarity, return SIMILARITY: 0.0" > "$WIKI_OUT" 2>&1 || true
+
+  SIMILARITY=$(grep "^SIMILARITY:" "$WIKI_OUT" | tail -1 | grep -o '[0-9]\.[0-9]*' | head -1)
+  [ -z "$SIMILARITY" ] && SIMILARITY="0.0"
+  
+  printf '   📊 Best match similarity: %s\n' "$SIMILARITY" >&2
+  
+  # LLM Wiki threshold: 0.75 for pattern reuse
+  if awk -v s="$SIMILARITY" 'BEGIN { exit (s+0 >= 0.75) ? 0 : 1 }' 2>/dev/null; then
     WIKI_MATCH=true
-    PATTERN_ID=$(grep -i "PATTERN_ID:" "$WIKI_OUT" | tail -1 | sed 's/.*PATTERN_ID:\s*//' || echo "NONE")
+    PATTERN_ID=$(grep "^PATTERN_ID:" "$WIKI_OUT" | tail -1 | sed 's/PATTERN_ID: //' | tr -d ' ')
     if [ -n "$PATTERN_ID" ] && [ "$PATTERN_ID" != "NONE" ]; then
-      WIKI_FILE="${WIKI_DIR}/${PATTERN_ID}"
-      [ -f "$WIKI_FILE" ] && WIKI_CONTENT=$(cat "$WIKI_FILE")
+      WIKI_FILE="${WIKI_DIR}/patterns/${PATTERN_ID}"
+      if [ -f "$WIKI_FILE" ]; then
+        WIKI_CONTENT=$(cat "$WIKI_FILE")
+        printf '   ✅ Pattern found: %s\n' "$PATTERN_ID" >&2
+        printf '   💡 Will enhance with existing knowledge\n' >&2
+      fi
     fi
+  else
+    printf '   📖 No matching pattern (threshold: 0.75)\n' >&2
+    printf '   🆕 Will create new pattern after execution\n' >&2
   fi
   rm -f "$WIKI_OUT"
+elif [ -d "$WIKI_DIR" ]; then
+  printf '   📁 Wiki exists but no patterns directory yet\n' >&2
+  printf '   🆕 Creating patterns directory...\n' >&2
+  mkdir -p "${WIKI_DIR}/patterns"
 else
-  printf '   ⚠️  Wiki directory not found: %s\n' "$WIKI_DIR" >&2
+  printf '   ⚠️  Wiki directory not configured\n' >&2
 fi
 
 # ═══════════════════════════════════════════════════════════════
@@ -212,35 +238,64 @@ ENDOFADVISOR
   ARCH_GUIDANCE=$(cat "$ADV_OUT")
   printf '   ✓ Architecture guidance received (%s lines)\n' "$(echo "$ARCH_GUIDANCE" | wc -l)" >&2
   
-  # Step 2b: MANDATORY - All 8 Specialists
-  printf '\n   Step 2b: MANDATORY - All 8 Agency Agents Specialists\n' >&2
+  # Step 2b: Task-Based Agent Selection (from 226 available agents)
+  printf '\n   Step 2b: Task-Based Agent Selection from Agency Agents\n' >&2
   
-  for STYPE in $ALL_SPECIALISTS; do
-    # Map specialist type to CORRECT agency-agents path
-    # Using msitarzewski/agency-agents structure (226 agents across all categories)
-    AA_FILE=""
-    case "$STYPE" in
-      security) AA_FILE="$AA_DIR/engineering/engineering-security-engineer.md" ;;
-      database) AA_FILE="$AA_DIR/engineering/engineering-database-optimizer.md" ;;
-      api) AA_FILE="$AA_DIR/testing/testing-api-tester.md" ;;
-      performance) AA_FILE="$AA_DIR/testing/testing-performance-benchmarker.md" ;;
-      devops) AA_FILE="$AA_DIR/engineering/engineering-devops-automator.md" ;;
-      frontend) AA_FILE="$AA_DIR/engineering/engineering-frontend-developer.md" ;;
-      backend) AA_FILE="$AA_DIR/engineering/engineering-backend-architect.md" ;;
-      ml) AA_FILE="$AA_DIR/engineering/engineering-ai-engineer.md" ;;
-    esac
+  # Select relevant agents based on task
+  SELECTED_AGENTS=$(mktemp)
+  cat > "$SELECTED_AGENTS" << AGENTSELECT
+Based on the task below, select the MOST RELEVANT agents from the agency-agents repository.
+
+Task: ${TASK}
+Complexity: ${SCORE}
+Domains: ${DOMAINS:-general}
+
+Available categories: ${AGENT_CATEGORIES}
+
+Output format - list the specific agent files to use (one per line):
+AGENT: <category>/<agent-filename.md>
+REASON: <one line why this agent is relevant>
+
+Example:
+AGENT: engineering/engineering-frontend-developer.md
+REASON: UI/UX development required
+
+Select 3-8 most relevant agents for this task.
+AGENTSELECT
+
+  AGENT_LIST=$(mktemp)
+  kilo run -m "${ADVISOR_MODEL}" --auto "$(cat "$SELECTED_AGENTS")" > "$AGENT_LIST" 2>&1 || true
+  
+  # Parse selected agents
+  printf '   📋 Selected agents for this task:\n' >&2
+  grep "^AGENT:" "$AGENT_LIST" | while read -r line; do
+    AGENT_FILE=$(echo "$line" | sed 's/AGENT: //' | tr -d ' ')
+    AGENT_PATH="$AA_DIR/$AGENT_FILE"
     
-    # Load specialist definition if exists
-    AA_PROMPT=""
-    if [ -n "$AA_FILE" ] && [ -f "$AA_FILE" ]; then
-      AA_PROMPT=$(cat "$AA_FILE" 2>/dev/null | head -150)
-      printf '     👤 %s: ' "$STYPE" >&2
+    if [ -f "$AGENT_PATH" ]; then
+      AGENT_NAME=$(basename "$AGENT_FILE" .md)
+      printf '     ✓ %s\n' "$AGENT_NAME" >&2
     else
-      printf '     ⚠️  %s: %s not found\n' "$STYPE" "$(basename "$AA_FILE")" >&2
+      printf '     ⚠️  %s not found\n' "$AGENT_FILE" >&2
+    fi
+  done
+  
+  # Consult each selected agent
+  printf '\n   🔍 Consulting selected agents...\n' >&2
+  
+  grep "^AGENT:" "$AGENT_LIST" | while read -r line; do
+    AGENT_FILE=$(echo "$line" | sed 's/AGENT: //' | tr -d ' ')
+    AGENT_PATH="$AA_DIR/$AGENT_FILE"
+    
+    if [ ! -f "$AGENT_PATH" ]; then
       continue
     fi
     
-    # Consult specialist
+    AGENT_NAME=$(basename "$AGENT_FILE" .md)
+    AA_PROMPT=$(cat "$AGENT_PATH" 2>/dev/null | head -150)
+    
+    printf '     👤 Consulting %s... ' "$AGENT_NAME" >&2
+    
     SPEC_OUT=$(mktemp)
     cat > "$SPEC_OUT" << SPECPROMPT
 ${AA_PROMPT}
@@ -250,13 +305,8 @@ ${AA_PROMPT}
 TASK: ${TASK}
 ARCHITECTURAL GUIDANCE: ${ARCH_GUIDANCE}
 
-Your role: As the ${STYPE} specialist, provide FOCUSED guidance on:
-1. What ${STYPE} considerations apply to this task?
-2. What are the best practices for ${STYPE} in this context?
-3. What pitfalls should be avoided?
-4. Specific recommendations (3-5 bullet points)
-
-Keep your response under 300 words and actionable.
+Provide FOCUSED guidance for your domain expertise on this task.
+Keep under 300 words and actionable.
 SPECPROMPT
     
     SPEC_RESP_OUT=$(mktemp)
@@ -264,10 +314,11 @@ SPECPROMPT
     
     SPEC_RESP=$(cat "$SPEC_RESP_OUT")
     if [ -n "$SPEC_RESP" ]; then
-      printf 'Guidance received (%s words)\n' "$(echo "$SPEC_RESP" | wc -w)" >&2
+      WORD_COUNT=$(echo "$SPEC_RESP" | wc -w)
+      printf '(%s words)\n' "$WORD_COUNT" >&2
       SPECIALIST_GUIDANCE="${SPECIALIST_GUIDANCE}
 
-## ${STYPE^} Specialist
+## ${AGENT_NAME}
 ${SPEC_RESP}"
     else
       printf 'No response\n' >&2
@@ -275,6 +326,8 @@ ${SPEC_RESP}"
     
     rm -f "$SPEC_OUT" "$SPEC_RESP_OUT"
   done
+  
+  rm -f "$SELECTED_AGENTS" "$AGENT_LIST"
   
   # Combine all guidance
   FULL_GUIDANCE="## Architectural Guidance
@@ -326,45 +379,64 @@ else
 fi
 
 # ═══════════════════════════════════════════════════════════════
-# Phase 4: Save to Wiki (If --force or new knowledge)
+# Phase 4: Save to Wiki (LLM Wiki Philosophy)
 # ═══════════════════════════════════════════════════════════════
 printf '\n%s\n' "═══════════════════════════════════════════════════════════════"
-printf '%s\n' " Phase 4: Knowledge Persistence"
+printf '%s\n' " Phase 4: Knowledge Persistence (LLM Wiki)"
 printf '%s\n' "═══════════════════════════════════════════════════════════════"
 
-if [ "$FORCE_MODE" = true ] && [ -d "$WIKI_DIR" ]; then
-  printf '   💾 Saving results to LLM Wiki...\n' >&2
+if [ -d "$WIKI_DIR" ]; then
+  printf '   💾 Saving pattern to LLM Wiki...\n' >&2
   
-  # Generate pattern ID
-  PATTERN_ID="$(date +%Y%m%d)-$(echo "$TASK" | tr ' ' '-' | tr '[:upper:]' '[:lower:]' | cut -c1-30)"
-  WIKI_FILE="${WIKI_DIR}/${PATTERN_ID}.md"
+  # Generate semantic pattern ID
+  TASK_HASH=$(echo "$TASK" | sha256sum | cut -c1-8)
+  PATTERN_NAME=$(echo "$TASK" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/-*$//' | cut -c1-40)
+  PATTERN_ID="pattern-${PATTERN_NAME}-${TASK_HASH}"
+  WIKI_FILE="${WIKI_DIR}/patterns/${PATTERN_ID}.md"
   
+  # Ensure patterns directory exists
+  mkdir -p "${WIKI_DIR}/patterns"
+  
+  # Build knowledge entry following LLM Wiki philosophy
   cat > "$WIKI_FILE" << WIKICONTENT
-# Pattern: ${TASK}
+---
+id: ${PATTERN_ID}
+title: ${TASK}
+complexity: ${SCORE}
+domains: ${DOMAINS:-general}
+date: $(date -Iseconds)
+similarity_threshold: 0.75
+---
 
-**Date**: $(date -Iseconds)
-**Complexity**: ${SCORE}
-**Domains**: ${ALL_SPECIALISTS}
+# ${TASK}
 
-## Task Description
-${TASK}
+## Context
+**Complexity Score**: ${SCORE}
+**Selected Agents**: ${SELECTED_AGENTS:-N/A}
 
-## Architectural Guidance
+## Architectural Pattern
 ${ARCH_GUIDANCE}
 
-## Specialist Guidance
+## Specialist Knowledge
 ${SPECIALIST_GUIDANCE}
 
-## Key Decisions
-- [To be filled after implementation]
+## Implementation Notes
+- **Status**: Generated
+- **Next Review**: After 3 uses or 30 days
 
-## Lessons Learned
-- [To be filled after implementation]
+## Related Patterns
+- [To be linked by similarity search]
+
+## Usage History
+- $(date -Iseconds): Created from task execution
 WIKICONTENT
   
-  printf '   ✅ Saved to: %s\n' "$WIKI_FILE" >&2
+  printf '   ✅ Pattern saved: %s\n' "$PATTERN_ID" >&2
+  printf '   📍 Location: %s\n' "$WIKI_FILE" >&2
+  printf '\n   💡 This pattern will be searchable in future Wiki queries\n' >&2
 else
-  printf '   ⏭️  Skipping Wiki save (use --force to save)\n' >&2
+  printf '   ⚠️  Wiki directory not found: %s\n' "$WIKI_DIR" >&2
+  printf '   Set WIKI_DIR environment variable to enable knowledge persistence\n' >&2
 fi
 
 # ═══════════════════════════════════════════════════════════════

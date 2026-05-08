@@ -1,0 +1,36 @@
+You are a team of specialists working on a voxel model gun simulator.
+
+# Your Team Composition:
+- **Frontend Developer**: Creates beautiful 3D voxel graphics with Three.js/Babylon.js
+- **Animation Specialist**: Ensures smooth assembly/disassembly animations
+- **UI/UX Designer**: Creates intuitive controls and beautiful interface
+
+# Task:
+Create a voxel art style model gun disassembly/assembly simulator.
+Requirements:
+1. Smooth animations for part movements
+2. Beautiful voxel-style gun model
+3. Excellent UI/UX with intuitive controls
+4. Interactive features:
+   - Click parts to select them
+   - Animated disassembly/assembly
+   - Exploded view mode
+   - Step-by-step guide
+
+# Output:
+Create a complete web application with:
+- index.html (main entry point)
+- styles.css (voxel-style dark theme)
+- app.js (game logic and animations)
+- gun_model.js (voxel gun data)
+- README.md (usage instructions)
+
+# Technical Requirements:
+- Use Three.js for 3D rendering
+- Implement voxel geometry creation
+- Add smooth easing animations
+- Include ambient and directional lighting
+- Make it responsive and touch-friendly
+- Add sound effects (optional but nice to have)
+
+Generate all files now.

@@ -1,18 +1,22 @@
 #!/usr/bin/env bash
-# advisor v4 — Programmatic Senior Engineer Advisor (MANDATORY Specialists)
+# advisor v4.1 — On-Demand Senior Engineer Advisor
+#
+# Philosophy: Let implementation agent try first, consult advisor only when stuck
+# Token Efficiency: Accumulate knowledge in Wiki for reuse across similar tasks
 #
 # Modes:
-#   (default) Smart:   Assess → Advisor if score >= 0.5 + MANDATORY specialists
-#   --force:           Always advisor + ALL specialists + Wiki save
-#   --wiki-only:       Advisor only if Wiki lacks knowledge
+#   (default)        Auto: Advisor if complexity >= 0.5
+#   --force          Experimental: Always trigger advisor (for testing)
+#   --on-demand      Smart: Implementation first, consult advisor on stuck
+#   --wiki-only      Conditional: Only if Wiki lacks knowledge
 #
-# Phase flow:
-#   0. Wiki check → Load patterns if exists
-#   1. Complexity assessment + ALL specialists assignment
-#   2. Advisor consultation → Architectural guidance
-#   3. Specialist consultation (MANDATORY - all 8 domains)
-#   4. Implementation with full guidance
-#   5. Save results to Wiki (if --force or new knowledge)
+# Phase flow (--on-demand):
+#   0. Wiki check → Reuse patterns if similarity >= 0.75
+#   1. Implementation agent tries task
+#   2. On-demand advisor consultation if stuck (complexity >= 0.5)
+#   3. Task-based specialist selection from 226 agents
+#   4. Continue implementation with guidance
+#   5. Save to Wiki (automatic)
 
 set -euo pipefail
 
@@ -39,6 +43,7 @@ TASK=""
 HAS_MODEL=false
 FORCE_MODE=false
 WIKI_ONLY=false
+ON_DEMAND=false
 DRY_RUN=false
 
 # Parse args
@@ -48,6 +53,7 @@ while [ $# -gt 0 ]; do
     --depth|--advice-depth) ADVICE_DEPTH="$2"; shift 2 ;;
     --force) FORCE_MODE=true; shift ;;
     --wiki-only) WIKI_ONLY=true; shift ;;
+    --on-demand) ON_DEMAND=true; shift ;;
     --dry-run) DRY_RUN=true; shift ;;
     --auto) ARGS+=("$1"); shift ;;
     *) TASK="$1"; shift ;;

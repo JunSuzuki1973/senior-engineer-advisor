@@ -1,153 +1,215 @@
-# Senior Engineer Advisor v4
+# Senior Engineer Advisor v4.1
 
-**アーキテクチャ指導 × 動的専門家アサイン × LLM Wikiナレッジ管理**
+**On-Demand Architectural Guidance for Cost-Effective AI Coding**
 
-コスパ重視モデルに「謙虚さ」「専門性」「品質保証」を与えるスキル。
-226人の専門家からタスクに最適なチームを動的アサインし、LLM Wikiで蓄積した知見を再利用。
-
----
-
-## 🎯 新機能（v4.0）
-
-### 1. 動的エージェント選択（226専門家から最適チームを選択）
-- **タスク分析** → 該当する専門家を3-8名自動選択
-- **Agency Agents統合**: https://github.com/msitarzewski/agency-agents
-- 無駄なコンサル防止、必要な専門性のみアサイン
-
-### 2. アドバイス深度設定（5段階）
-```bash
-advisor --depth 5 --auto "タスク"
-```
-| レベル | 詳細度 |
-|--------|--------|
-| 1 | Simple - 大枠のみ |
-| 2 | General - 主要ポイント |
-| 3 | Standard - アーキテクチャ+決定事項+落とし穴（デフォルト）|
-| 4 | Detailed - 実装提案、詳細分析含む |
-| 5 | Comprehensive - 徹底分析、代替案、コードパターン |
-
-### 3. LLM Wikiナレッジサイクル
-```
-タスク入力
-    ↓
-Wiki検索（類似度0.75以上で再利用）
-    ↓
-該当エージェントにコンサル
-    ↓
-実装
-    ↓
-Wikiに自動保存（パターンとして蓄積）
-    ↓
-次回以降のタスクで活用 ← ナレッジが螺旋的に充実
-```
-
-### 4. コードレビュー統合
-- 実装後の自動品質チェック
-- Opus 4.6による専門的レビュー
-- ユーザー許可制
+A token-efficient approach that lets implementation agents try first, consults specialists only when stuck, and accumulates knowledge in LLM Wiki for reuse.
 
 ---
 
-## 🚀 クイックスタート
+## 🎯 Philosophy
 
-### インストール
+Traditional approaches: *"Design everything upfront, then implement"*
+
+**Our approach**: *"Implement first, consult experts on-demand, accumulate knowledge"*
+
+This philosophy is based on the observation that:
+- **Modern mid-tier models (GLM-5)** can self-direct many tasks effectively
+- **Frontier model consultation** is most valuable when the agent is genuinely stuck
+- **Knowledge accumulation** through LLM Wiki provides compounding returns
+
+---
+
+## ✨ Key Features
+
+### 1. On-Demand Advisor (v4.1)
 ```bash
-# OpenClawスキルとしてインストール
+advisor --on-demand --auto "your task"
+```
+
+**Flow**:
+1. Implementation agent (GLM-5) attempts task first
+2. Self-assesses complexity/confidence
+3. **Only if stuck** (complexity >= 0.5): Consult advisor + specialists
+4. Continue with guidance
+5. Save successful patterns to Wiki
+
+### 2. Dynamic Specialist Selection
+From **226 available agents** in Agency Agents repository, select 3-8 most relevant based on task analysis:
+- Keyword-based heuristic selection (fast, reliable)
+- No unnecessary consultations
+- Fallback to opencode CLI if kilo unavailable
+
+### 3. Advice Depth Control (5 Levels)
+```bash
+advisor --depth 4 --auto "complex task"
+```
+
+| Level | Detail | Use Case |
+|-------|--------|----------|
+| 1 | Simple - Big picture only | Routine tasks |
+| 2 | General - Key decisions | Standard features |
+| 3 | **Standard** - Architecture + pitfalls + best practices | **Default** |
+| 4 | Detailed - Implementation suggestions | Complex systems |
+| 5 | Comprehensive - Exhaustive analysis | Critical architecture |
+
+### 4. LLM Wiki Knowledge Cycle
+```
+Task → Wiki Search (similarity >= 0.75) → Implementation → Wiki Save → Reuse
+```
+
+**Benefits**:
+- 1st occurrence: Full consultation
+- 2nd+ occurrences: Reuse patterns (87% cost reduction)
+- Continuous improvement through usage history
+
+---
+
+## 🚀 Quick Start
+
+### Installation
+```bash
+# Clone repository
 git clone https://github.com/JunSuzuki1973/senior-engineer-advisor.git
-ln -sf $(pwd)/senior-engineer-advisor/integrations/advisor.sh ~/.local/bin/advisor
-```
+cd senior-engineer-advisor
 
-### 環境設定
-```bash
-# ~/.bashrc or ~/.zshrc
+# Create symlink
+ln -sf $(pwd)/integrations/advisor.sh ~/.local/bin/advisor
+
+# Setup environment
 export WIKI_DIR="$HOME/openclaw-wiki"
 export AA_DIR="$HOME/agency-agents"
-export ADVICE_DEPTH="3"  # 1-5
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
-### 使用方法
+### Usage Examples
+
 ```bash
-# スタンダード（深度3）
-advisor --auto "機能を実装して"
+# Recommended: On-demand mode (smart consultation)
+advisor --on-demand --auto "Build a JWT authentication system"
 
-# 最も詳細なアドバイス（深度5）
-advisor --depth 5 --auto "複雑な機能を実装して"
+# Standard: Auto-detect complexity
+advisor --auto "Create a React component"
 
-# Wikiに必ず保存
-advisor --force --auto "機能を実装して"
+# Experimental: Force advisor (for testing)
+advisor --force --depth 5 --auto "Design microservices architecture"
 
-# Wiki未構築時のみ発動
-advisor --wiki-only --auto "調査タスク"
+# Conditional: Only if no Wiki knowledge
+advisor --wiki-only --auto "Investigate new technology"
 
-# ドライラン（実行せず確認のみ）
-advisor --dry-run --auto "機能を実装して"
+# Preview mode
+advisor --dry-run --auto "Your task here"
 ```
 
 ---
 
-## 📊 動作フロー
+## 📊 System Architecture
 
-### Phase 0: Wikiナレッジ検索
-- 既存パターンを類似度検索（閾値0.75）
-- 該当パターンがあれば知見を活用
-
-### Phase 1: 複雑度評価 + エージェント選択
-- タスクの複雑度をスコアリング
-- 226エージェントの中から該当者を3-8名選択
-
-### Phase 2: アドバイザー + 専門家コンサル
-- Opus 4.6がアーキテクチャ指導（深度設定に応じて詳細度変更）
-- 選択された専門家から個別ガイダンス
-
-### Phase 3: 実装
-- 指導に基づき実装エージェントがコーディング
-- 専門家レビューを実施
-
-### Phase 4: Wiki自動保存
-- パターンとして一般化し保存
-- Usage Historyで改善追跡
-
----
-
-## 💰 コスト分析
-
-| シナリオ | 従来（Opus単体） | advisor使用 | 削減率 |
-|---------|----------------|------------|--------|
-| 単純タスク | $0.15 | $0.03 | 80% |
-| 複雑タスク（深度3） | $0.15 | $0.05 | 67% |
-| 複雑タスク（深度5） | $0.15 | $0.08 | 47% |
-| Wiki再利用時 | $0.15 | $0.02 | 87% |
-
-**月50タスク/日の場合**: $225 → $35-70（70-85%削減）
-
----
-
-## ⚙️ 設定
-
-### 環境変数
-```bash
-# 必須
-export WIKI_DIR="$HOME/openclaw-wiki"        # LLM Wikiパス
-export AA_DIR="$HOME/agency-agents"          # Agency Agentsパス
-
-# オプション
-export ADVICE_DEPTH="3"                      # デフォルト深度（1-5）
-export DEFAULT_MODEL="opencode-go/glm-5"     # 実装モデル
-export ADVISOR_MODEL="kilo/anthropic/claude-opus-4-6"  # アドバイザーモデル
+```
+┌─────────────────────────────────────────────────────────┐
+│                    Task Input                           │
+└──────────────────┬──────────────────────────────────────┘
+                   │
+    ┌──────────────▼──────────────┐
+    │   Phase 0: Wiki Search      │
+    │   (Similarity >= 0.75)      │
+    │   ↓ Match found: Reuse      │
+    └──────────────┬──────────────┘
+                   │ No match
+    ┌──────────────▼──────────────┐
+    │   Phase 1: Implementation   │
+    │   Agent tries task          │
+    └──────────────┬──────────────┘
+                   │
+        ┌─────────┴─────────┐
+        ↓                   ↓
+   [Confident]         [Stuck/Complex]
+        ↓                   ↓
+   Complete        Consult Advisor
+                        ↓
+                   Select Specialists
+                        ↓
+                   Continue & Save
 ```
 
-### config.yaml
+---
+
+## 💰 Cost Analysis
+
+| Scenario | Traditional (Opus) | advisor v4.1 | Savings |
+|----------|-------------------|--------------|---------|
+| Simple task (GLM-5 handles) | $0.15 | $0.03 | 80% |
+| Complex task (on-demand consult) | $0.15 | $0.05-0.08 | 47-67% |
+| Pattern reuse (Wiki hit) | $0.15 | $0.02 | **87%** |
+| **50 tasks/day, 30% reuse** | $225 | **$35-50** | **78-84%** |
+
+---
+
+## 🔬 Experimental Results
+
+### Test: Voxel Assault Rifle Simulator
+
+**Task**: Create a voxel art style assault rifle disassembly/assembly simulator with smooth animations and interactive controls.
+
+| Metric | With Advisor (Depth 5) | Direct Implementation |
+|--------|----------------------|----------------------|
+| Time | 8m 1s | **4m 18s** |
+| Tokens | 60.0k | **31.1k** |
+| Code Lines | ~600 | **911** |
+| Quality | High | **High** |
+| Architecture | Glass-morphism UI | Multi-light rendering |
+
+**Key Finding**: Direct implementation was **2x faster, 50% cheaper** with comparable quality.
+
+**Insight**: The advisor's value is not immediate quality boost but **knowledge accumulation** for reuse.
+
+---
+
+## 📁 Repository Structure
+
+```
+senior-engineer-advisor/
+├── integrations/
+│   └── advisor.sh          # Main script (v4.1)
+├── prompts/
+│   └── agent_system.md     # Implementation agent prompt
+├── tests/                  # Test results & reports
+│   ├── assault-rifle-v4/   # v4.0 test results
+│   └── [future-tests]/
+├── docs/                   # GitHub Pages deployment
+│   ├── index.html          # Test comparison report
+│   ├── test-a-v4/          # Test A application
+│   └── test-b-v4/          # Test B application
+├── README.md               # This file (English)
+├── README_JA.md            # Japanese documentation
+├── CHANGELOG.md            # Release history
+├── VERSION                 # Current version
+└── config.yaml             # Configuration template
+```
+
+---
+
+## ⚙️ Configuration
+
+### Environment Variables
+```bash
+# Required
+export WIKI_DIR="$HOME/openclaw-wiki"              # LLM Wiki path
+export AA_DIR="$HOME/agency-agents"                # Agency Agents path
+
+# Optional
+export ADVICE_DEPTH="3"                            # Default depth (1-5)
+export DEFAULT_MODEL="opencode-go/glm-5"          # Implementation model
+export ADVISOR_MODEL="kilo/anthropic/claude-opus-4-6"  # Advisor model
+```
+
+### Config File (config.yaml)
 ```yaml
 advisor:
   general:
     model: "kilo/anthropic/claude-opus-4-6"
     max_tokens: 800
+  advice_depth: 3                    # 1-5
   
-  # アドバイス深度: 1-5
-  advice_depth: 3
-  
-  # コードレビュー設定
   code_review:
     enabled: true
     require_permission: true
@@ -161,74 +223,25 @@ knowledge:
 
 ---
 
-## 🏗️ システム構成
+## 🔗 Related Projects
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                    User Request                         │
-└──────────────────┬──────────────────────────────────────┘
-                   │
-    ┌──────────────▼──────────────┐
-    │   Phase 0: Wiki Search      │
-    │   (Similarity ≥ 0.75)       │
-    └──────────────┬──────────────┘
-                   │
-    ┌──────────────▼──────────────┐
-    │   Phase 1: Task Analysis    │
-    │   - Complexity scoring      │
-    │   - Agent selection         │
-    └──────────────┬──────────────┘
-                   │
-    ┌──────────────▼──────────────┐
-    │   Phase 2: Consultation     │
-    │   - Architect (Opus 4.6)    │
-    │   - Specialists (3-8名)     │
-    └──────────────┬──────────────┘
-                   │
-    ┌──────────────▼──────────────┐
-    │   Phase 3: Implementation   │
-    │   - GLM-5 / opencode-go     │
-    │   - With specialist review  │
-    └──────────────┬──────────────┘
-                   │
-    ┌──────────────▼──────────────┐
-    │   Phase 4: Wiki Save        │
-    │   - Pattern generalization  │
-    │   - Knowledge accumulation  │
-    └─────────────────────────────┘
-```
+- **[Agency Agents](https://github.com/msitarzewski/agency-agents)** - 226 specialized AI agents
+- **[LLM Wiki](https://github.com/karpathy/llm-wiki)** - Knowledge management philosophy
 
 ---
 
-## 📁 リポジトリ構成
+## 📝 Version History
 
-```
-senior-engineer-advisor/
-├── integrations/
-│   └── advisor.sh          # メインスクリプト
-├── prompts/
-│   └── agent_system.md     # 実装エージェント用プロンプト
-├── config.yaml             # 設定ファイル
-├── .env.example            # 環境変数テンプレート
-├── tests/                  # テスト結果
-│   └── voxel-gun/          # 比較テスト
-├── SKILL.md                # 技術仕様
-└── README.md               # このファイル
-```
+See [CHANGELOG.md](CHANGELOG.md) for detailed release history.
+
+**Current**: v4.1.0 - On-demand advisor consultation
 
 ---
 
-## 🔗 関連リポジトリ
-
-- **[Agency Agents](https://github.com/msitarzewski/agency-agents)** - 226名の専門家エージェント
-- **[LLM Wiki](https://github.com/karpathy/llm-wiki)** - ナレッジベース管理思想
-
----
-
-## 📄 ライセンス
+## 📄 License
 
 MIT License
 
 ---
 
-*Senior Engineer Advisor v4 - 設計された謙虚さと専門性で、AIコーディングの品質を向上*
+*Built with the philosophy: "Accumulate knowledge, don't just consume it."*

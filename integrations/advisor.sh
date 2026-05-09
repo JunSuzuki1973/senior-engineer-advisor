@@ -1,22 +1,27 @@
 #!/usr/bin/env bash
-# advisor v4.1 — On-Demand Senior Engineer Advisor
+# advisor v4.1 — Complexity-Based Senior Engineer Advisor
 #
-# Philosophy: Let implementation agent try first, consult advisor only when stuck
-# Token Efficiency: Accumulate knowledge in Wiki for reuse across similar tasks
+# Philosophy: Adjust advisor involvement based on task complexity score
+# Token Efficiency: Minimal guidance for simple tasks, comprehensive for complex ones
+#
+# Complexity-Based Auto-Detection (DEFAULT):
+#   0.0-0.3 Simple    → No advisor, self-direct
+#   0.3-0.5 Medium    → Advisor optional
+#   0.5-0.7 Complex   → Advisor recommended (auto-depth 4)
+#   0.7-1.0 High      → Advisor required (auto-depth 5)
 #
 # Modes:
-#   (default)        Auto: Advisor if complexity >= 0.5
-#   --force          Experimental: Always trigger advisor (for testing)
-#   --on-demand      Smart: Implementation first, consult advisor on stuck
+#   (default)        Auto: Complexity-based advisor detection
+#   --force          Experimental: Always trigger advisor
+#   --on-demand      Smart: Implementation first, consult if stuck
 #   --wiki-only      Conditional: Only if Wiki lacks knowledge
 #
-# Phase flow (--on-demand):
+# Phase flow:
 #   0. Wiki check → Reuse patterns if similarity >= 0.75
-#   1. Implementation agent tries task
-#   2. On-demand advisor consultation if stuck (complexity >= 0.5)
-#   3. Task-based specialist selection from 226 agents
-#   4. Continue implementation with guidance
-#   5. Save to Wiki (automatic)
+#   1. Complexity assessment → Auto-determine advisor necessity and depth
+#   2. (If needed) Task-based specialist selection from 226 agents
+#   3. Implementation with appropriate guidance level
+#   4. Save to Wiki (automatic)
 
 set -euo pipefail
 
@@ -66,16 +71,28 @@ if ! [[ "$ADVICE_DEPTH" =~ ^[1-5]$ ]]; then
   ADVICE_DEPTH="3"
 fi
 
-[ -z "$TASK" ] && { 
-  echo "Usage: advisor [--force|--wiki-only|--depth N] [options] \"task\"" >&2
+[ -z "$TASK" ] && {
+  echo "Usage: advisor [MODE] [options] \"task\"" >&2
   echo "" >&2
-  echo "Options:" >&2
-  echo "  --depth N      Advice depth level (1-5, default: 3)" >&2
+  echo "MODES (Complexity-Based Auto-Detection is DEFAULT):" >&2
+  echo "  (default)      Auto: Advisor automatically triggered based on complexity score" >&2
+  echo "                   0.0-0.3 Simple    → No advisor (self-direct)" >&2
+  echo "                   0.3-0.5 Medium    → Advisor optional" >&2
+  echo "                   0.5-0.7 Complex   → Advisor recommended (auto-depth 4)" >&2
+  echo "                   0.7-1.0 High      → Advisor required (auto-depth 5)" >&2
+  echo "  --force        Experimental: Always trigger advisor (ignore complexity)" >&2
+  echo "  --on-demand    Smart: Implementation first, consult only if stuck" >&2
+  echo "  --wiki-only    Conditional: Only trigger if Wiki lacks knowledge" >&2
+  echo "" >&2
+  echo "OPTIONS:" >&2
+  echo "  --depth N      Override advice depth (1-5, default: auto-detect)" >&2
   echo "                   1=Simple, 2=General, 3=Standard, 4=Detailed, 5=Comprehensive" >&2
-  echo "  --force        Always use advisor + save to Wiki" >&2
-  echo "  --wiki-only    Use advisor only if Wiki lacks knowledge" >&2
-  echo "  --dry-run      Show what would be executed" >&2
-  echo "  -m, --model    Specify implementation model" >&2
+  echo "  --dry-run      Preview mode: Show what would be executed" >&2
+  echo "  -m, --model    Specify implementation model (default: opencode-go/glm-5)" >&2
+  echo "" >&2
+  echo "RECOMMENDED:" >&2
+  echo "  advisor --auto \"your task\"           # DEFAULT: complexity-based auto-detection" >&2
+  echo "  advisor --depth 5 --auto \"task\"      # Force depth 5 regardless of complexity" >&2
   exit 1
 }
 [ "$HAS_MODEL" = false ] && ARGS=("-m" "$DEFAULT_MODEL" "${ARGS[@]}")
@@ -171,12 +188,22 @@ DOMAINS=$(grep -i "DOMAINS:" "$OUT1" | tail -1 | sed 's/.*DOMAINS:\s*//' | tr -d
 printf '   📊 Complexity: %s\n' "$SCORE" >&2
 printf '   🎯 Domains: %s\n' "${DOMAINS:-all}" >&2
 
-# Determine if advisor needed
+# Determine advisor strategy based on complexity score
+# Auto-adjust advice depth based on complexity
+AUTO_DEPTH="$ADVICE_DEPTH"
 NEED_ADVISOR=false
+
 if [ "$FORCE_MODE" = true ]; then
+  # Experimental: Force advisor regardless of complexity
   NEED_ADVISOR=true
-  printf '   🚀 Mode: FORCED → Advisor + ALL specialists\n' >&2
+  printf '   🚀 Mode: FORCED → Advisor always triggered\n' >&2
+elif [ "$ON_DEMAND" = true ]; then
+  # On-demand: Let implementation try first, consult only if stuck
+  NEED_ADVISOR=false
+  printf '   📍 Mode: ON-DEMAND → Implementation first, consult if stuck\n' >&2
+  printf '   💡 Advisor will be available on-demand during implementation\n' >&2
 elif [ "$WIKI_ONLY" = true ]; then
+  # Wiki-only: Only if no knowledge in Wiki
   if [ "$WIKI_MATCH" = false ]; then
     NEED_ADVISOR=true
     printf '   📖 Mode: WIKI-ONLY → No knowledge, triggering advisor\n' >&2
@@ -184,9 +211,52 @@ elif [ "$WIKI_ONLY" = true ]; then
     printf '   ✅ Mode: WIKI-ONLY → Knowledge exists (%s)\n' "$PATTERN_ID" >&2
   fi
 else
-  if awk -v s="$SCORE" -v t="$THRESHOLD" 'BEGIN { exit (s+0 >= t+0) ? 0 : 1 }' 2>/dev/null; then
-    NEED_ADVISOR=true
-  fi
+  # DEFAULT: Complexity-based auto-detection
+  # Adjust depth and advisor necessity based on score
+  case "$SCORE" in
+    0.0|0.[0-2]*)
+      # Simple tasks: No advisor needed, depth 1-2 if used
+      AUTO_DEPTH="2"
+      NEED_ADVISOR=false
+      printf '   📊 Complexity: %s (Simple) → No advisor needed\n' "$SCORE" >&2
+      printf '   💡 Tip: Implementation agent can self-direct this task\n' >&2
+      ;;
+    0.3|0.[3-4]*)
+      # Medium tasks: Optional advisor, depth 2-3
+      AUTO_DEPTH="3"
+      NEED_ADVISOR=false
+      printf '   📊 Complexity: %s (Medium) → Advisor optional\n' "$SCORE" >&2
+      printf '   💡 Use --force if you want advisor guidance\n' >&2
+      ;;
+    0.5|0.[5-6]*)
+      # Complex tasks: Advisor recommended, depth 3-4
+      AUTO_DEPTH="4"
+      NEED_ADVISOR=true
+      printf '   📊 Complexity: %s (Complex) → Advisor recommended\n' "$SCORE" >&2
+      ;;
+    0.7|0.[7-9]*|1.0)
+      # High complexity: Advisor required, depth 4-5
+      AUTO_DEPTH="5"
+      NEED_ADVISOR=true
+      printf '   📊 Complexity: %s (High) → Advisor required\n' "$SCORE" >&2
+      ;;
+    *)
+      # Default fallback
+      AUTO_DEPTH="3"
+      if awk -v s="$SCORE" -v t="$THRESHOLD" 'BEGIN { exit (s+0 >= t+0) ? 0 : 1 }' 2>/dev/null; then
+        NEED_ADVISOR=true
+        printf '   📊 Complexity: %s → Advisor recommended\n' "$SCORE" >&2
+      else
+        NEED_ADVISOR=false
+        printf '   📊 Complexity: %s → No advisor needed\n' "$SCORE" >&2
+      fi
+      ;;
+  esac
+fi
+
+# Override auto-detected depth if user specified
+if [ "$ADVICE_DEPTH" != "3" ]; then
+  AUTO_DEPTH="$ADVICE_DEPTH"
 fi
 
 rm -f "$ASSESS_TMP" "$OUT1"

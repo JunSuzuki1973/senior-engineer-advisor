@@ -1,0 +1,29 @@
+# OpenClaw adapter configuration for Senior Engineer Advisor
+# Place this at: ~/.openclaw/agents/senior-engineer-advisor.yaml
+
+agent:
+  name: senior-engineer-advisor
+  description: "Cheap model implements, Opus advises — with LLM Wiki knowledge accumulation"
+  version: "4.0"
+
+commands:
+  - name: advisor
+    description: "Run full advisor pipeline"
+    exec: "python -m core.cli"
+    args: "{input}"
+
+  - name: advisor-wiki
+    description: "Search LLM Wiki only (no LLM calls)"
+    exec: "python -m core.cli --wiki-only"
+    args: "{input}"
+
+  - name: advisor-dry
+    description: "Complexity score only"
+    exec: "python -m core.cli --dry-run"
+    args: "{input}"
+
+# OpenRouter provider (OpenAI-compatible):
+#   AGENT_API_BASE=https://openrouter.ai/api/v1
+#   ADVISOR_API_BASE=https://openrouter.ai/api/v1
+#
+# Both use the same openai-compatible interface regardless of underlying model.

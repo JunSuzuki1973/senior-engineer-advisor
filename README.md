@@ -1,234 +1,225 @@
-# Senior Engineer Advisor v4
+# Senior Engineer Advisor
 
-**アーキテクチャ指導 × 動的専門家アサイン × LLM Wikiナレッジ管理**
+> A cheap model implements. Opus advises. The wiki remembers.
 
-コスパ重視モデルに「謙虚さ」「専門性」「品質保証」を与えるスキル。
-226人の専門家からタスクに最適なチームを動的アサインし、LLM Wikiで蓄積した知見を再利用。
+**Senior Engineer Advisor** is a multi-model AI orchestration system for software development.  
+Cheap, fast models handle everyday implementation. Claude Opus steps in only when architectural guidance is needed. Every solution is stored in an LLM Wiki — so recurring tasks cost nothing the second time.
+
+📖 [日本語ドキュメント](README_JA.md)
 
 ---
 
-## 🎯 新機能（v4.0）
+## How it works
 
-### 1. 動的エージェント選択（226専門家から最適チームを選択）
-- **タスク分析** → 該当する専門家を3-8名自動選択
-- **Agency Agents統合**: https://github.com/msitarzewski/agency-agents
-- 無駄なコンサル防止、必要な専門性のみアサイン
+```
+Task
+ └─► Wiki search ──── hit ──► Implement (zero LLM cost)
+          │
+         miss
+          │
+          └─► Complexity score (cheap model)
+                    │
+               score ≥ 0.5          score < 0.5
+                    │                    │
+                    ▼                    ▼
+             Opus advises        Implement directly
+                    │                    │
+                    └──────┬────────────┘
+                           ▼
+                     Save to wiki
+```
 
-### 2. アドバイス深度設定（5段階）
+---
+
+## Supported tools
+
+| Tool | Status |
+|---|---|
+| Claude Code | ✅ |
+| OpenCode | ✅ |
+| Kilo CLI | ✅ |
+| OpenClaw | ✅ |
+
+---
+
+## Supported providers (OpenAI-compatible)
+
+All providers share the same OpenAI-compatible interface.  
+Mix and match: use a cheap provider for the agent, Anthropic/OpenRouter for Opus.
+
+| Provider | Agent model example | Advisor model example |
+|---|---|---|
+| [OpenRouter](https://openrouter.ai) | `deepseek/deepseek-chat-v3-5` | `anthropic/claude-opus-4.6` |
+| [Kilo Pass](https://kilocode.ai) | `deepseek/deepseek-v3` | `anthropic/claude-opus-4.6` |
+| [Together.ai](https://together.ai) | `Qwen/Qwen3-235B-A22B` | — |
+| Anthropic Direct | — | `claude-opus-4-5-20251001` |
+| Ollama (local) | `qwen2.5-coder:32b` | — |
+
+> **No vendor lock-in.** Switch providers by changing two lines in `.env`.
+
+---
+
+## Quick start
+
+### 1. Clone
+
 ```bash
-advisor --depth 5 --auto "タスク"
-```
-| レベル | 詳細度 |
-|--------|--------|
-| 1 | Simple - 大枠のみ |
-| 2 | General - 主要ポイント |
-| 3 | Standard - アーキテクチャ+決定事項+落とし穴（デフォルト）|
-| 4 | Detailed - 実装提案、詳細分析含む |
-| 5 | Comprehensive - 徹底分析、代替案、コードパターン |
-
-### 3. LLM Wikiナレッジサイクル
-```
-タスク入力
-    ↓
-Wiki検索（類似度0.75以上で再利用）
-    ↓
-該当エージェントにコンサル
-    ↓
-実装
-    ↓
-Wikiに自動保存（パターンとして蓄積）
-    ↓
-次回以降のタスクで活用 ← ナレッジが螺旋的に充実
+git clone https://github.com/JunSuzuki1973/senior-engineer-advisor
+cd senior-engineer-advisor
 ```
 
-### 4. コードレビュー統合
-- 実装後の自動品質チェック
-- Opus 4.6による専門的レビュー
-- ユーザー許可制
+### 2. Configure
 
----
-
-## 🚀 クイックスタート
-
-### インストール
 ```bash
-# OpenClawスキルとしてインストール
-git clone https://github.com/JunSuzuki1973/senior-engineer-advisor.git
-ln -sf $(pwd)/senior-engineer-advisor/integrations/advisor.sh ~/.local/bin/advisor
+cp .env.example .env
 ```
 
-### 環境設定
+Minimum config (OpenRouter — one key covers both agent and advisor):
+
 ```bash
-# ~/.bashrc or ~/.zshrc
-export WIKI_DIR="$HOME/openclaw-wiki"
-export AA_DIR="$HOME/agency-agents"
-export ADVICE_DEPTH="3"  # 1-5
-export PATH="$HOME/.local/bin:$PATH"
+AGENT_API_KEY=sk-or-xxxx
+AGENT_MODEL=deepseek/deepseek-chat-v3-5
+
+ADVISOR_API_KEY=sk-or-xxxx
+ADVISOR_MODEL=anthropic/claude-opus-4.6
 ```
 
-### 使用方法
+See [`.env.example`](.env.example) for all provider options.
+
+### 3. Install
+
 ```bash
-# スタンダード（深度3）
-advisor --auto "機能を実装して"
+# Auto-detect your tool (claude, opencode, kilo, openclaw)
+bash scripts/install.sh
 
-# 最も詳細なアドバイス（深度5）
-advisor --depth 5 --auto "複雑な機能を実装して"
-
-# Wikiに必ず保存
-advisor --force --auto "機能を実装して"
-
-# Wiki未構築時のみ発動
-advisor --wiki-only --auto "調査タスク"
-
-# ドライラン（実行せず確認のみ）
-advisor --dry-run --auto "機能を実装して"
+# Or specify explicitly
+bash scripts/install.sh claude-code
 ```
 
----
+### 4. Verify
 
-## 📊 動作フロー
-
-### Phase 0: Wikiナレッジ検索
-- 既存パターンを類似度検索（閾値0.75）
-- 該当パターンがあれば知見を活用
-
-### Phase 1: 複雑度評価 + エージェント選択
-- タスクの複雑度をスコアリング
-- 226エージェントの中から該当者を3-8名選択
-
-### Phase 2: アドバイザー + 専門家コンサル
-- Opus 4.6がアーキテクチャ指導（深度設定に応じて詳細度変更）
-- 選択された専門家から個別ガイダンス
-
-### Phase 3: 実装
-- 指導に基づき実装エージェントがコーディング
-- 専門家レビューを実施
-
-### Phase 4: Wiki自動保存
-- パターンとして一般化し保存
-- Usage Historyで改善追跡
-
----
-
-## 💰 コスト分析
-
-| シナリオ | 従来（Opus単体） | advisor使用 | 削減率 |
-|---------|----------------|------------|--------|
-| 単純タスク | $0.15 | $0.03 | 80% |
-| 複雑タスク（深度3） | $0.15 | $0.05 | 67% |
-| 複雑タスク（深度5） | $0.15 | $0.08 | 47% |
-| Wiki再利用時 | $0.15 | $0.02 | 87% |
-
-**月50タスク/日の場合**: $225 → $35-70（70-85%削減）
-
----
-
-## ⚙️ 設定
-
-### 環境変数
 ```bash
-# 必須
-export WIKI_DIR="$HOME/openclaw-wiki"        # LLM Wikiパス
-export AA_DIR="$HOME/agency-agents"          # Agency Agentsパス
+# Complexity check only (minimal API usage)
+python -m core.cli --dry-run "Implement JWT refresh token rotation with Redis"
 
-# オプション
-export ADVICE_DEPTH="3"                      # デフォルト深度（1-5）
-export DEFAULT_MODEL="opencode-go/glm-5"     # 実装モデル
-export ADVISOR_MODEL="kilo/anthropic/claude-opus-4-6"  # アドバイザーモデル
-```
-
-### config.yaml
-```yaml
-advisor:
-  general:
-    model: "kilo/anthropic/claude-opus-4-6"
-    max_tokens: 800
-  
-  # アドバイス深度: 1-5
-  advice_depth: 3
-  
-  # コードレビュー設定
-  code_review:
-    enabled: true
-    require_permission: true
-
-knowledge:
-  llm_wiki:
-    enabled: true
-    path: "~/openclaw-wiki"
-    auto_save: true
+# Full run
+python -m core.cli "Add rate limiting to the login endpoint"
 ```
 
 ---
 
-## 🏗️ システム構成
+## Usage
+
+### CLI
+
+```bash
+advisor "task description"           # Full pipeline
+advisor --dry-run "task"             # Complexity score only
+advisor --wiki-only "keyword"        # Search wiki, no LLM calls
+advisor --no-save "task"            # Skip wiki save
+advisor --depth 5 "task"            # Detailed Opus advice (1–5)
+```
+
+### Claude Code slash commands
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    User Request                         │
-└──────────────────┬──────────────────────────────────────┘
-                   │
-    ┌──────────────▼──────────────┐
-    │   Phase 0: Wiki Search      │
-    │   (Similarity ≥ 0.75)       │
-    └──────────────┬──────────────┘
-                   │
-    ┌──────────────▼──────────────┐
-    │   Phase 1: Task Analysis    │
-    │   - Complexity scoring      │
-    │   - Agent selection         │
-    └──────────────┬──────────────┘
-                   │
-    ┌──────────────▼──────────────┐
-    │   Phase 2: Consultation     │
-    │   - Architect (Opus 4.6)    │
-    │   - Specialists (3-8名)     │
-    └──────────────┬──────────────┘
-                   │
-    ┌──────────────▼──────────────┐
-    │   Phase 3: Implementation   │
-    │   - GLM-5 / opencode-go     │
-    │   - With specialist review  │
-    └──────────────┬──────────────┘
-                   │
-    ┌──────────────▼──────────────┐
-    │   Phase 4: Wiki Save        │
-    │   - Pattern generalization  │
-    │   - Knowledge accumulation  │
-    └─────────────────────────────┘
+/advisor   Implement JWT refresh token rotation
+/advisor-wiki   JWT authentication
+/advisor-dry    Add rate limiting to the login endpoint
 ```
 
 ---
 
-## 📁 リポジトリ構成
+## LLM Wiki — knowledge that grows
+
+Every solution is stored as a Markdown file in `$WIKI_DIR` (default: `~/.advisor/wiki/`).  
+When a similar task arrives, the wiki is checked first — no model calls needed.
+
+**Karpathy pattern**: new knowledge *overwrites* the existing note rather than appending.  
+Notes stay current instead of accumulating stale layers.
+
+### Obsidian integration (optional)
+
+```bash
+OBSIDIAN_VAULT=/path/to/your/vault   # in .env
+```
+
+Point the wiki at an Obsidian vault to get graph view, backlinks, and search UI.
+
+---
+
+## Specialist agents
+
+### Built-in (8 domains)
+
+Defined in [`agents/`](agents/):
+
+| File | Domain |
+|---|---|
+| `security.md` | Auth, JWT, OWASP, cryptography |
+| `database.md` | Schema design, migrations, query optimization |
+| `api.md` | REST, GraphQL, gRPC, OpenAPI |
+| `performance.md` | Caching, profiling, concurrency |
+| `devops.md` | Docker, Kubernetes, CI/CD, IaC |
+| `frontend.md` | React/Vue, accessibility, Core Web Vitals |
+| `backend.md` | Clean architecture, microservices, DDD |
+| `ml.md` | LLM integration, embeddings, RAG |
+
+### Extended: agency-agents (optional)
+
+Import 144+ specialist agents from [msitarzewski/agency-agents](https://github.com/msitarzewski/agency-agents) (MIT):
+
+```bash
+bash scripts/convert/agency-agents.sh
+```
+
+---
+
+## Project structure
 
 ```
 senior-engineer-advisor/
-├── integrations/
-│   └── advisor.sh          # メインスクリプト
+├── core/
+│   ├── providers.py        # OpenAI-compatible client factory
+│   ├── complexity.py       # Complexity scoring via cheap model
+│   ├── wiki.py             # LLM Wiki (Karpathy rewrite pattern)
+│   ├── orchestrator.py     # Main pipeline
+│   └── cli.py              # advisor CLI entry point
 ├── prompts/
-│   └── agent_system.md     # 実装エージェント用プロンプト
-├── config.yaml             # 設定ファイル
-├── .env.example            # 環境変数テンプレート
-├── tests/                  # テスト結果
-│   └── voxel-gun/          # 比較テスト
-├── SKILL.md                # 技術仕様
-└── README.md               # このファイル
+│   ├── complexity.md       # Scoring prompt (JSON output)
+│   ├── advisor_system.md   # Opus role: guidance only, no code
+│   ├── agent_system.md     # Implementation agent rules
+│   └── agency_assignment.md  # Specialist routing table
+├── agents/                 # 8 built-in specialist definitions
+├── adapters/
+│   ├── claude-code/        # CLAUDE.md + slash commands
+│   ├── opencode/           # config.yaml
+│   ├── kilo/               # config.yaml
+│   └── openclaw/           # config.yaml
+├── scripts/
+│   ├── install.sh          # Auto-detect tool and install
+│   └── convert/            # Per-tool conversion scripts
+├── .env.example            # All provider options documented
+├── config.yaml             # Structural settings
+└── requirements.txt        # openai, python-dotenv, pyyaml
 ```
 
 ---
 
-## 🔗 関連リポジトリ
+## Requirements
 
-- **[Agency Agents](https://github.com/msitarzewski/agency-agents)** - 226名の専門家エージェント
-- **[LLM Wiki](https://github.com/karpathy/llm-wiki)** - ナレッジベース管理思想
-
----
-
-## 📄 ライセンス
-
-MIT License
+- Python 3.10+
+- One API key for the agent model (any OpenAI-compatible provider)
+- One API key for the advisor model (OpenRouter, Kilo Pass, or Anthropic direct)
+- Obsidian app (optional — for wiki UI)
 
 ---
 
-*Senior Engineer Advisor v4 - 設計された謙虚さと専門性で、AIコーディングの品質を向上*
+## License
+
+MIT License — Copyright 2026 Jun Suzuki
+
+This project references and integrates with:
+- [msitarzewski/agency-agents](https://github.com/msitarzewski/agency-agents) (MIT)
+- [eugeniughelbur/obsidian-second-brain](https://github.com/eugeniughelbur/obsidian-second-brain) (MIT)
+- Andrey Karpathy's [LLM Wiki pattern](https://x.com/karpathy)

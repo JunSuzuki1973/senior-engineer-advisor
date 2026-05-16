@@ -1,0 +1,36 @@
+# OpenCode adapter configuration for Senior Engineer Advisor
+# Place this file at: .opencode/advisor.yaml (or import in your opencode config)
+
+agents:
+  advisor:
+    description: "Senior Engineer Advisor — routes tasks through cheap model + Opus"
+    command: "python -m core.cli"
+    env:
+      - AGENT_API_KEY
+      - AGENT_API_BASE
+      - AGENT_MODEL
+      - ADVISOR_API_KEY
+      - ADVISOR_API_BASE
+      - ADVISOR_MODEL
+      - WIKI_DIR
+      - COMPLEXITY_THRESHOLD
+      - ADVICE_DEPTH
+
+  advisor-wiki:
+    description: "Search LLM Wiki only"
+    command: "python -m core.cli --wiki-only"
+
+  advisor-dry:
+    description: "Complexity assessment only (no implementation)"
+    command: "python -m core.cli --dry-run"
+
+# Provider examples for OpenCode
+# Set your preferred provider in environment variables per .env.example
+#
+# OpenRouter (recommended — covers both cheap models and Opus):
+#   AGENT_API_BASE=https://openrouter.ai/api/v1
+#   ADVISOR_API_BASE=https://openrouter.ai/api/v1
+#
+# Kilo Pass:
+#   AGENT_API_BASE=https://api.kilocode.ai/v1
+#   ADVISOR_API_BASE=https://api.kilocode.ai/v1

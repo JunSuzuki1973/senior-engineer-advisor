@@ -1,59 +1,40 @@
-# Senior Engineer Advisor — Configuration
-# Environment: KiloClaw / KiloCode
+# Senior Engineer Advisor — Static configuration
+# Runtime values are in .env. This file stores structural settings.
 
-agent:
-  model: "kilo/deepseek/deepseek-v4-pro"
-  provider: "kilo"
+version: "4.0"
 
-advisor:
-  general:
-    model: "kilo/anthropic/claude-opus-4.7"
-    provider: "kilo"
-    max_tokens: 800
-  
-  # Advice Depth: 1-5 (controls level of detail from advisor)
-  # 1=Simple, 2=General, 3=Standard, 4=Detailed, 5=Comprehensive
-  advice_depth: 3
+orchestrator:
+  complexity_threshold: 0.5   # override with COMPLEXITY_THRESHOLD env var
+  advice_depth: 3             # 1-5, override with ADVICE_DEPTH env var
+  auto_save_wiki: true        # save results to wiki by default
 
-  agency_agents:
-    enabled: true
-    specialists:
-      security:
-        model: "kilo/anthropic/claude-opus-4.7"
-        description: "Security Architect"
-      database:
-        model: "kilo/anthropic/claude-opus-4.7"
-        description: "Database Expert"
-      api:
-        model: "kilo/anthropic/claude-opus-4.7"
-        description: "API Designer"
-      performance:
-        model: "kilo/anthropic/claude-opus-4.7"
-        description: "Performance Engineer"
-      devops:
-        model: "kilo/anthropic/claude-opus-4.7"
-        description: "DevOps Specialist"
-      frontend:
-        model: "kilo/anthropic/claude-opus-4.7"
-        description: "Frontend Architect"
-      backend:
-        model: "kilo/anthropic/claude-opus-4.7"
-        description: "Backend Architect"
-      ml:
-        model: "kilo/anthropic/claude-opus-4.7"
-        description: "ML Engineer"
+wiki:
+  threshold: 0.25             # keyword similarity threshold for cache hit
+  max_results: 3              # return top N results (future: semantic search)
+  rewrite_on_update: true     # Karpathy pattern: overwrite, don't append
+
+specialists:
+  # Core specialists shipped with this repo
+  builtin:
+    - security
+    - database
+    - api
+    - performance
+    - devops
+    - frontend
+    - backend
+    - ml
+  # Extended specialists from agency-agents (run scripts/convert/agency-agents.sh)
+  extended_dir: agents/
 
 code_review:
-  enabled: true
-  require_permission: true
-  reviewer_model: "kilo/anthropic/claude-opus-4.7"
-  trigger_on:
-    - "user_dissatisfied"
-    - "bug_reported"
-    - "high_complexity"
+  enabled: false              # post-implementation review (future feature)
+  trigger_on_complexity: 0.8
 
-knowledge:
-  llm_wiki:
-    enabled: true
-    path: "/root/openclaw-wiki"
-    auto_save: true
+tools:
+  # Supported AI coding tool adapters
+  supported:
+    - claude-code
+    - opencode
+    - kilo
+    - openclaw

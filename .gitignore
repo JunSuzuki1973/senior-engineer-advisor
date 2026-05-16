@@ -1,24 +1,12 @@
-# Dependencies
-node_modules/
-package-lock.json
-
-# Build outputs
+.env
+__pycache__/
+*.pyc
+*.egg-info/
 dist/
 build/
-
-# Logs
+.venv/
+venv/
+wiki/
 *.log
-logs/
-
-# Environment
-.env
-
-# OS
 .DS_Store
 Thumbs.db
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo

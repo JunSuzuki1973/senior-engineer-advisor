@@ -1,0 +1,34 @@
+# Kilo CLI adapter configuration for Senior Engineer Advisor
+# Place this at: ~/.kilo/advisors/senior-engineer.yaml
+
+name: senior-engineer-advisor
+version: "4.0"
+description: "Multi-model advisor: cheap model implements, Opus advises"
+
+commands:
+  advisor:
+    run: "python -m core.cli {task}"
+    description: "Full advisor pipeline"
+
+  advisor-wiki:
+    run: "python -m core.cli --wiki-only {query}"
+    description: "Wiki search only"
+
+  advisor-dry:
+    run: "python -m core.cli --dry-run {task}"
+    description: "Complexity check only"
+
+# Kilo Pass provider settings
+# Use Kilo Pass as API gateway for both agent and advisor models:
+#
+#   AGENT_API_BASE=https://api.kilocode.ai/v1
+#   AGENT_API_KEY=<kilo-pass-key>
+#   AGENT_MODEL=deepseek/deepseek-v3          # or qwen/qwen3-235b
+#
+#   ADVISOR_API_BASE=https://api.kilocode.ai/v1
+#   ADVISOR_API_KEY=<kilo-pass-key>
+#   ADVISOR_MODEL=anthropic/claude-opus-4.6
+
+env_required:
+  - AGENT_API_KEY
+  - ADVISOR_API_KEY
